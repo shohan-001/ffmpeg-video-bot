@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  ffmpeg-bot:
+    build: .
+    container_name: ffmpeg-processor-bot
+    restart: unless-stopped
+    volumes:
+      - ./downloads:/app/downloads
+      - ./outputs:/app/outputs
+      - ./config.env:/app/config.env:ro
+      - ./bot.log:/app/bot.log
+    environment:
+      - TZ=Asia/Kolkata
+    networks:
+      - bot-network
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:6.0
+    container_name: ffmpeg-bot-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - bot-network
+    ports:
+      - "27017:27017"
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

@@ -1,0 +1,33 @@
+# Byte-compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Environment
+config.env
+.env
+
+# Logs
+*.log
+bot.log
+
+# Directories
+downloads/
+outputs/
+Thumbnails/
+
+# Session files
+*.session
+*.session-journal
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
