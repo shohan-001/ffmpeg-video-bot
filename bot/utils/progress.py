@@ -16,16 +16,26 @@ class Progress:
         self,
         message,
         operation: str = "Processing",
-        update_interval: float = 3.0
+        update_interval: float = 3.0,
+        user_id: int = None
     ):
         self.message = message
         self.operation = operation
         self.update_interval = update_interval
         self.last_update_time = 0
         self.start_time = time()
+        self.user_id = user_id
+        self.cancelled = False
+    
+    def cancel(self):
+        """Mark as cancelled"""
+        self.cancelled = True
     
     async def progress_callback(self, current: int, total: int):
         """Callback for pyrogram progress"""
+        if self.cancelled:
+            raise asyncio.CancelledError("Cancelled by user")
+        
         now = time()
         
         if now - self.last_update_time < self.update_interval:
@@ -53,8 +63,14 @@ class Progress:
             f"<b>ETA:</b> {self._format_time(eta)}"
         )
         
+        # Add cancel button
+        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        cancel_btn = InlineKeyboardMarkup([[
+            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel_process_{self.user_id or 0}")
+        ]]) if self.user_id else None
+        
         try:
-            await self.message.edit_text(text)
+            await self.message.edit_text(text, reply_markup=cancel_btn)
         except Exception as e:
             LOGGER.debug(f"Progress update error: {e}")
     

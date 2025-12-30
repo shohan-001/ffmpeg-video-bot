@@ -2,6 +2,7 @@
 """File handler for receiving videos"""
 
 import os
+import asyncio
 from pyrogram import Client, filters
 from pyrogram.types import Message
 
@@ -136,12 +137,13 @@ async def handle_photo(client: Client, message: Message):
         )
 
 
-async def download_file(message: Message, status_msg: Message) -> str:
+async def download_file(message: Message, status_msg: Message, user_id: int = None) -> str:
     """Download file from message with progress"""
     user = message.from_user
+    uid = user_id or user.id
     
     # Create user directory
-    user_dir = os.path.join(DOWNLOAD_DIR, str(user.id))
+    user_dir = os.path.join(DOWNLOAD_DIR, str(uid))
     os.makedirs(user_dir, exist_ok=True)
     
     # Get file name
@@ -156,19 +158,33 @@ async def download_file(message: Message, status_msg: Message) -> str:
     
     file_path = os.path.join(user_dir, file_name)
     
-    progress = Progress(status_msg, "📥 Downloading")
+    # Create progress with cancel button
+    progress = Progress(status_msg, "📥 Downloading", user_id=uid)
     
-    await message.download(
-        file_name=file_path,
-        progress=progress.progress_callback
-    )
+    # Store progress instance for cancellation
+    if uid in user_data:
+        user_data[uid]['progress'] = progress
+    
+    try:
+        await message.download(
+            file_name=file_path,
+            progress=progress.progress_callback
+        )
+    except Exception as e:
+        if progress.cancelled:
+            raise asyncio.CancelledError("Cancelled by user")
+        raise e
     
     return file_path
 
 
-async def upload_file(client: Client, chat_id: int, file_path: str, status_msg: Message, caption: str = None):
+async def upload_file(client: Client, chat_id: int, file_path: str, status_msg: Message, caption: str = None, user_id: int = None):
     """Upload file with progress"""
-    progress = Progress(status_msg, "📤 Uploading")
+    progress = Progress(status_msg, "📤 Uploading", user_id=user_id)
+    
+    # Store progress for cancellation
+    if user_id and user_id in user_data:
+        user_data[user_id]['progress'] = progress
     
     file_size = os.path.getsize(file_path)
     file_name = os.path.basename(file_path)
@@ -177,17 +193,22 @@ async def upload_file(client: Client, chat_id: int, file_path: str, status_msg: 
     video_exts = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
     ext = os.path.splitext(file_name)[1].lower()
     
-    if ext in video_exts:
-        await client.send_video(
-            chat_id,
-            file_path,
-            caption=caption or f"✅ <code>{file_name}</code>",
-            progress=progress.progress_callback
-        )
-    else:
-        await client.send_document(
-            chat_id,
-            file_path,
-            caption=caption or f"✅ <code>{file_name}</code>",
-            progress=progress.progress_callback
-        )
+    try:
+        if ext in video_exts:
+            await client.send_video(
+                chat_id,
+                file_path,
+                caption=caption or f"✅ <code>{file_name}</code>",
+                progress=progress.progress_callback
+            )
+        else:
+            await client.send_document(
+                chat_id,
+                file_path,
+                caption=caption or f"✅ <code>{file_name}</code>",
+                progress=progress.progress_callback
+            )
+    except Exception as e:
+        if progress.cancelled:
+            raise asyncio.CancelledError("Cancelled by user")
+        raise e

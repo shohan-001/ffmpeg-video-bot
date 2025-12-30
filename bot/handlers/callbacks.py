@@ -26,6 +26,40 @@ async def close_callback(client: Client, query: CallbackQuery):
     await query.answer("Closed!")
 
 
+@bot.on_callback_query(filters.regex(r"^cancel_process_"))
+async def cancel_process_callback(client: Client, query: CallbackQuery):
+    """Cancel ongoing download/upload/processing"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    # Cancel progress
+    if user_id in user_data and 'progress' in user_data[user_id]:
+        user_data[user_id]['progress'].cancel()
+        
+    await query.answer("⏹️ Cancelling...", show_alert=True)
+    
+    try:
+        await query.message.edit_text("❌ <b>Cancelled by user</b>")
+    except:
+        pass
+    
+    # Cleanup any partial files
+    if user_id in user_data:
+        if 'file_path' in user_data[user_id] and user_data[user_id]['file_path']:
+            try:
+                os.remove(user_data[user_id]['file_path'])
+            except:
+                pass
+        if 'output_path' in user_data[user_id]:
+            try:
+                os.remove(user_data[user_id]['output_path'])
+            except:
+                pass
+
+
 @bot.on_callback_query(filters.regex(r"^main_"))
 async def main_menu_callback(client: Client, query: CallbackQuery):
     """Return to main menu"""
@@ -57,7 +91,7 @@ async def metadata_callback(client: Client, query: CallbackQuery):
         "<code>title: Your Title\n"
         "author: Author Name\n"
         "album: Album Name\n"
-        "year: 2024</code>\n\n"
+        "year: 2026</code>\n\n"
         "Or send just the title.",
         reply_markup=close_button(user_id)
     )
