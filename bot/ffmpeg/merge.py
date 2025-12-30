@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Callable, Tuple
 
-from bot.ffmpeg.core import FFmpeg
+from bot.ffmpeg.core import FFmpeg, run_ffmpeg_command
 
 LOGGER = logging.getLogger(__name__)
 
@@ -15,7 +15,8 @@ async def merge_videos(
     video1: str,
     video2: str,
     output: str,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Merge two videos (concatenate)"""
     
@@ -33,13 +34,7 @@ async def merge_videos(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
     
     # Cleanup concat file
     try:
@@ -47,10 +42,7 @@ async def merge_videos(
     except:
         pass
     
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    return success, result if not success else output
 
 
 async def add_audio_to_video(
@@ -58,7 +50,8 @@ async def add_audio_to_video(
     audio_file: str,
     output: str,
     replace: bool = False,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Add or replace audio track in video"""
     
@@ -87,25 +80,16 @@ async def add_audio_to_video(
             output
         ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def add_subtitle_to_video(
     video_file: str,
     subtitle_file: str,
     output: str,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Add subtitle track to video (soft sub)"""
     
@@ -128,18 +112,8 @@ async def add_subtitle_to_video(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def swap_streams(
@@ -147,7 +121,8 @@ async def swap_streams(
     output: str,
     video_stream: int = 0,
     audio_stream: int = 0,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Swap/reorder streams in video"""
     
@@ -161,15 +136,5 @@ async def swap_streams(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output

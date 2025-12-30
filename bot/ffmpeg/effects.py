@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Callable, Tuple
 
-from bot.ffmpeg.core import FFmpeg
+from bot.ffmpeg.core import FFmpeg, run_ffmpeg_command
 
 LOGGER = logging.getLogger(__name__)
 
@@ -18,7 +18,8 @@ async def add_image_watermark(
     position: str = 'bottom_right',
     opacity: float = 0.7,
     scale: float = 0.15,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Add image watermark to video"""
     
@@ -53,18 +54,8 @@ async def add_image_watermark(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def add_text_watermark(
@@ -75,7 +66,8 @@ async def add_text_watermark(
     font_size: int = 24,
     font_color: str = 'white',
     opacity: float = 0.7,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Add text watermark to video"""
     
@@ -113,25 +105,16 @@ async def add_text_watermark(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def burn_subtitles(
     input_file: str,
     subtitle_file: str,
     output: str,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Burn subtitles into video (hardsub)"""
     
@@ -156,7 +139,7 @@ async def burn_subtitles(
         '-c:a', 'copy'
     ]
     
-    success, error = await ffmpeg.run_ffmpeg(cmd, progress_callback)
+    success, error = await ffmpeg.run_ffmpeg(cmd, progress_callback, duration)
     
     if not success:
         return False, error
@@ -168,7 +151,8 @@ async def burn_embedded_subtitles(
     input_file: str,
     output: str,
     subtitle_index: int = 0,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Burn embedded subtitles from video itself"""
     
@@ -182,7 +166,7 @@ async def burn_embedded_subtitles(
         '-c:a', 'copy'
     ]
     
-    success, error = await ffmpeg.run_ffmpeg(cmd, progress_callback)
+    success, error = await ffmpeg.run_ffmpeg(cmd, progress_callback, duration)
     
     if not success:
         return False, error
@@ -197,7 +181,8 @@ async def add_subtitle_intro(
     duration: float = 3.0,
     font_size: int = 48,
     font_color: str = 'white',
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    video_duration: float = None
 ) -> Tuple[bool, str]:
     """Add text intro at the beginning of video"""
     
@@ -221,18 +206,8 @@ async def add_subtitle_intro(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, video_duration)
+    return success, result if not success else output
 
 
 async def add_video_overlay(
@@ -241,7 +216,8 @@ async def add_video_overlay(
     output: str,
     position: str = 'bottom_right',
     scale: float = 0.25,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Add picture-in-picture video overlay"""
     
@@ -268,15 +244,5 @@ async def add_video_overlay(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output

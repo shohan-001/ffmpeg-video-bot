@@ -6,13 +6,17 @@ import asyncio
 import logging
 from typing import Callable, Tuple, List
 
+from bot.ffmpeg.core import run_ffmpeg_command
+
 LOGGER = logging.getLogger(__name__)
 
 
 async def extract_video(
     input_file: str,
     output: str,
-    stream_index: int = 0
+    stream_index: int = 0,
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Extract video stream only (no audio)"""
     
@@ -25,18 +29,8 @@ async def extract_video(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def extract_audio(
@@ -44,7 +38,9 @@ async def extract_audio(
     output: str,
     stream_index: int = 0,
     codec: str = 'mp3',
-    bitrate: str = '192k'
+    bitrate: str = '192k',
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Extract audio stream to specified format"""
     
@@ -77,24 +73,16 @@ async def extract_audio(
         cmd.remove('-b:a')
         cmd.remove(bitrate)
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def extract_subtitles(
     input_file: str,
     output: str,
-    stream_index: int = 0
+    stream_index: int = 0,
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Extract subtitle stream"""
     
@@ -105,18 +93,8 @@ async def extract_subtitles(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def extract_thumbnail(
@@ -215,7 +193,12 @@ async def extract_screenshots(
     return len(screenshots) > 0, screenshots
 
 
-async def remove_audio(input_file: str, output: str) -> Tuple[bool, str]:
+async def remove_audio(
+    input_file: str, 
+    output: str,
+    progress_callback: Callable = None,
+    duration: float = None
+) -> Tuple[bool, str]:
     """Remove all audio streams from video"""
     
     cmd = [
@@ -226,21 +209,16 @@ async def remove_audio(input_file: str, output: str) -> Tuple[bool, str]:
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
-async def remove_video(input_file: str, output: str) -> Tuple[bool, str]:
+async def remove_video(
+    input_file: str, 
+    output: str,
+    progress_callback: Callable = None,
+    duration: float = None
+) -> Tuple[bool, str]:
     """Remove video stream (keep audio only)"""
     
     cmd = [
@@ -251,21 +229,16 @@ async def remove_video(input_file: str, output: str) -> Tuple[bool, str]:
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
-async def remove_subtitles(input_file: str, output: str) -> Tuple[bool, str]:
+async def remove_subtitles(
+    input_file: str, 
+    output: str,
+    progress_callback: Callable = None,
+    duration: float = None
+) -> Tuple[bool, str]:
     """Remove all subtitle streams"""
     
     cmd = [
@@ -276,15 +249,5 @@ async def remove_subtitles(input_file: str, output: str) -> Tuple[bool, str]:
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output

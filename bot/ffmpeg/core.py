@@ -196,40 +196,59 @@ async def get_video_info(file_path: str) -> Dict[str, Any]:
     return result
 
 
-async def format_media_info(info: Dict[str, Any]) -> str:
-    """Format media info as readable text"""
-    if not info:
-        return "❌ Could not get media information"
+    return text
+
+
+async def run_ffmpeg_command(
+    cmd: list,
+    progress_callback: Callable = None,
+    duration: float = None
+) -> Tuple[bool, str]:
+    """Run arbitrary FFmpeg command with progress"""
     
-    duration_str = f"{int(info['duration'] // 60)}:{int(info['duration'] % 60):02d}"
-    size_mb = info['size'] / (1024 * 1024)
-    bitrate_kbps = info['bitrate'] / 1000
+    # Ensure command includes progress pipe if not present
+    if progress_callback and '-progress' not in cmd:
+        # Insert after 'ffmpeg' (index 1) to be safe
+        # Assuming cmd[0] is 'ffmpeg'
+        insert_idx = 1
+        cmd.insert(insert_idx, '-progress')
+        cmd.insert(insert_idx+1, 'pipe:1')
     
-    text = (
-        f"<b>📁 File:</b> <code>{info['filename']}</code>\n"
-        f"<b>📦 Format:</b> {info['format']}\n"
-        f"<b>⏱️ Duration:</b> {duration_str}\n"
-        f"<b>💾 Size:</b> {size_mb:.2f} MB\n"
-        f"<b>📊 Bitrate:</b> {bitrate_kbps:.0f} kbps\n"
+    LOGGER.info(f"Running: {' '.join(cmd)}")
+    
+    process = await asyncio.create_subprocess_exec(
+        *cmd,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE
     )
     
-    if 'video' in info:
-        v = info['video']
-        text += (
-            f"\n<b>🎬 Video:</b>\n"
-            f"  • Codec: {v['codec']}\n"
-            f"  • Resolution: {v['width']}x{v['height']}\n"
-            f"  • FPS: {v['fps']:.2f}\n"
-        )
+    # Parse progress output
+    while True:
+        line = await process.stdout.readline()
+        if not line:
+            break
+            
+        line = line.decode().strip()
+        
+        # Parse out_time for progress
+        if line.startswith('out_time_ms='):
+            try:
+                time_ms = int(line.split('=')[1])
+                current_time = time_ms / 1_000_000
+                if progress_callback and duration:
+                    try:
+                        await progress_callback(current_time)
+                    except Exception:
+                        pass
+            except ValueError:
+                pass
     
-    if 'audio' in info:
-        text += f"\n<b>🔊 Audio Tracks:</b> {len(info['audio'])}\n"
-        for i, a in enumerate(info['audio'], 1):
-            text += f"  {i}. {a['codec']} | {a['channels']}ch | {a['language']}\n"
+    await process.wait()
     
-    if 'subtitles' in info:
-        text += f"\n<b>📝 Subtitles:</b> {len(info['subtitles'])}\n"
-        for i, s in enumerate(info['subtitles'], 1):
-            text += f"  {i}. {s['codec']} | {s['language']}\n"
+    if process.returncode != 0:
+        stderr = await process.stderr.read()
+        error = stderr.decode().strip()
+        LOGGER.error(f"FFmpeg error: {error}")
+        return False, error
     
-    return text
+    return True, "Success"

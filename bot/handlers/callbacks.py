@@ -1169,7 +1169,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         if operation == 'convert':
             fmt = options.get('format', 'mp4')
             output_path = os.path.join(output_dir, f"{base_name}.{fmt}")
-            success, result = await convert_format(input_path, fmt, output_path)
+            success, result = await convert_format(input_path, fmt, output_path, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
@@ -1179,14 +1179,14 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
             fmt = options.get('format', 'mp3')
             idx = int(options.get('stream_index', 0))
             output_path = os.path.join(output_dir, f"{base_name}_track{idx}.{fmt}")
-            success, result = await extract_audio(input_path, output_path, stream_index=idx, codec=fmt)
+            success, result = await extract_audio(input_path, output_path, stream_index=idx, codec=fmt, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
                 error = result
         
         elif operation == 'remove_audio':
-            success, result = await remove_audio(input_path, output_path)
+            success, result = await remove_audio(input_path, output_path, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
@@ -1195,7 +1195,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         elif operation == 'extract_video':
             idx = int(options.get('stream_index', 0))
             output_path = os.path.join(output_dir, f"{base_name}_video{idx}{ext}")
-            success, result = await extract_video(input_path, output_path, stream_index=idx)
+            success, result = await extract_video(input_path, output_path, stream_index=idx, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
@@ -1204,7 +1204,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         elif operation == 'extract_subs':
             idx = int(options.get('stream_index', 0))
             output_path = os.path.join(output_dir, f"{base_name}_track{idx}.srt")
-            success, result = await extract_subtitles(input_path, output_path, stream_index=idx)
+            success, result = await extract_subtitles(input_path, output_path, stream_index=idx, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
@@ -1311,7 +1311,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 error = result
 
         elif operation == 'streamswap':
-            success, result = await swap_streams(input_path, output_path)
+            success, result = await swap_streams(input_path, output_path, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
@@ -1328,7 +1328,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 second_path = await download_file(msg, status_msg)
                 
                 await status_msg.edit_text("⚙️ Merging videos...")
-                success, result = await merge_videos(input_path, second_path, output_path)
+                success, result = await merge_videos(input_path, second_path, output_path, progress_callback=progress.update, duration=duration)
                 
                 # Cleanup second video
                 try:
@@ -1345,7 +1345,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
             # Text or Image?
             wm_text = options.get('text')
             if wm_text:
-                success, result = await add_text_watermark(input_path, wm_text, output_path, **options)
+                success, result = await add_text_watermark(input_path, wm_text, output_path, progress_callback=progress.update, duration=duration, **options)
             else:
                 # Image
                 # Need to download image if not local (but wait, how do we get image?)
@@ -1354,7 +1354,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 if msg:
                      # Download image
                      wm_path = await download_file(msg, status_msg)
-                     success, result = await add_image_watermark(input_path, wm_path, output_path, **options)
+                     success, result = await add_image_watermark(input_path, wm_path, output_path, progress_callback=progress.update, duration=duration, **options)
                      try:
                          os.remove(wm_path)
                      except:
@@ -1380,9 +1380,9 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 
                 await status_msg.edit_text("⚙️ Adding subtitles...")
                 if operation == 'hardsub':
-                    success, result = await burn_subtitles(input_path, sub_path, output_path)
+                    success, result = await burn_subtitles(input_path, sub_path, output_path, progress_callback=progress.update, duration=duration)
                 else:
-                    success, result = await add_subtitle_to_video(input_path, sub_path, output_path)
+                    success, result = await add_subtitle_to_video(input_path, sub_path, output_path, progress_callback=progress.update, duration=duration)
                 
                 try:
                     os.remove(sub_path)
@@ -1405,7 +1405,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 aud_path = await download_file(msg, status_msg)
                 
                 await status_msg.edit_text("⚙️ Adding audio...")
-                success, result = await add_audio_to_video(input_path, aud_path, output_path)
+                success, result = await add_audio_to_video(input_path, aud_path, output_path, progress_callback=progress.update, duration=duration)
                 
                 try:
                     os.remove(aud_path)
@@ -1419,7 +1419,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
 
         elif operation == 'speed':
             speed = options.get('speed', 1.0)
-            success, result = await change_speed(input_path, output_path, speed)
+            success, result = await change_speed(input_path, output_path, speed, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
@@ -1427,15 +1427,29 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
 
         elif operation == 'rotate':
             rotation = options.get('rotation', 'right')
-            success, result = await rotate_video(input_path, output_path, rotation)
+            success, result = await rotate_video(input_path, output_path, rotation, progress_callback=progress.update, duration=duration)
             if success:
                 output_path = result
             else:
                 error = result
         
-        else:
-            success = False
-            error = f"Unknown operation: {operation}"
+        elif operation == 'encode':
+             # Note: encode_video signature is (input, output, ..., progress_callback)
+             # FFmpeg wrapper handles duration internally, so no need to pass it
+             success, result = await encode_video(input_path, output_path, **options, progress_callback=progress.update)
+             if success:
+                 output_path = result
+             else:
+                 error = result
+
+        elif operation == 'convert':
+             fmt = options.get('format', 'mp4')
+             # convert_format now accepts duration and progress_callback
+             success, result = await convert_format(input_path, fmt, output_path, progress_callback=progress.update, duration=duration)
+             if success:
+                 output_path = result
+             else:
+                 error = result
         
         if not success:
             await status_msg.edit_text(f"❌ Error: {error[:500]}")

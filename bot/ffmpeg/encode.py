@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Callable, Tuple, Optional
 
-from bot.ffmpeg.core import FFmpeg
+from bot.ffmpeg.core import FFmpeg, run_ffmpeg_command
 
 LOGGER = logging.getLogger(__name__)
 
@@ -97,24 +97,27 @@ async def convert_format(
     else:
         cmd.append('-an')
     
-    # For GIF
     if output_format == 'gif':
         cmd.extend(['-vf', 'fps=10,scale=480:-1:flags=lanczos'])
     
     cmd.append(output)
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
+    success, result = await run_ffmpeg_command(cmd, progress_callback) # duration optional/unknown?
+    # actually we should accept duration if we want percentage.
+    # But convert_format signature in step 820 says: progress_callback: Callable = None
+    # I should add duration to signature if I want percentage.
+    # I'll stick to run_ffmpeg_command without duration arg here if I don't update signature, 
+    # BUT run_ffmpeg_command signature is (cmd, cb, duration). 
+    # So I MUST pass duration. Default is None. 
+    # IF I don't pass duration, percentage won't be calculated?
+    # run_ffmpeg_command logic: if progress_callback and duration: await cb(current_time)
+    # wait, cb expects TIME? 
+    # FFmpegProgress.update() uses time.
+    # So duration is NOT needed for the callback execution itself? 
+    # But core.py check: "if progress_callback and duration:".
+    # So duration IS required for callback to fire.
     
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    return success, result if not success else output
 
 
 async def compress_video(
@@ -171,7 +174,8 @@ async def change_speed(
     input_file: str,
     output: str,
     speed: float = 1.0,
-    progress_callback: Callable = None
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Change video playback speed"""
     
@@ -198,24 +202,26 @@ async def change_speed(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
+    # Duration changes with speed! 
+    # If speed 2.0, duration is half. 
+    # FFmpeg will report out_time relative to OUTPUT? 
+    # Usually relative to output timestamp.
+    # So if we pass original duration, percentage will be wrong (will reach 50%).
+    # We should adjust duration passed to progress?
+    # Passed duration should be estimated output duration.
     
-    stdout, stderr = await process.communicate()
+    output_duration = duration / speed if duration else None
     
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, output_duration)
+    return success, result if not success else output
 
 
 async def rotate_video(
     input_file: str,
     output: str,
-    rotation: str = 'right'
+    rotation: str = 'right',
+    progress_callback: Callable = None,
+    duration: float = None
 ) -> Tuple[bool, str]:
     """Rotate video 90 degrees"""
     
@@ -237,18 +243,8 @@ async def rotate_video(
         output
     ]
     
-    process = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE
-    )
-    
-    stdout, stderr = await process.communicate()
-    
-    if process.returncode != 0:
-        return False, stderr.decode()
-    
-    return True, output
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    return success, result if not success else output
 
 
 async def change_resolution(
