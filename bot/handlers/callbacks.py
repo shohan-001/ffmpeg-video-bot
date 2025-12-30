@@ -602,6 +602,86 @@ async def extract_screenshots_callback(client: Client, query: CallbackQuery):
     await process_video(client, query, 'extract_screenshots', {})
 
 
+@bot.on_callback_query(filters.regex(r"^speed_"))
+async def speed_callback(client: Client, query: CallbackQuery):
+    """Handle Speed menu and selection"""
+    parts = query.data.split("_")
+    
+    # Check if menu request or selection
+    if len(parts) == 2:
+        # Show Speed Menu
+        user_id = int(parts[1])
+        if query.from_user.id != user_id:
+            await query.answer("Not your button!", show_alert=True)
+            return
+            
+        await query.message.edit_text(
+            "<b>⏩ Select Speed</b>\n\n"
+            "Values < 1.0 slow down\n"
+            "Values > 1.0 speed up",
+            reply_markup=speed_menu(user_id)
+        )
+        await query.answer()
+        return
+
+    # Selection: speed_{value}_{user_id}
+    speed = float(parts[1])
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    await query.answer(f"Setting speed to {speed}x...")
+    await process_video(client, query, 'speed', {'speed': speed})
+
+
+@bot.on_callback_query(filters.regex(r"^rotate_"))
+async def rotate_callback(client: Client, query: CallbackQuery):
+    """Handle Rotate menu and selection"""
+    parts = query.data.split("_")
+    
+    # Check if menu request (rotate_uid)
+    if len(parts) == 2:
+        user_id = int(parts[1])
+        if query.from_user.id != user_id:
+            await query.answer("Not your button!", show_alert=True)
+            return
+            
+        await query.message.edit_text(
+            "<b>🔄 Select Rotation</b>",
+            reply_markup=rotate_menu(user_id)
+        )
+        await query.answer()
+        return
+        
+    # Selection: rotate_{val}_{uid}
+    val = parts[1]
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    await query.answer(f"Rotating {val}...")
+    await process_video(client, query, 'rotate', {'rotation': val})
+
+
+@bot.on_callback_query(filters.regex(r"^flip_"))
+async def flip_callback(client: Client, query: CallbackQuery):
+    """Handle Flip actions"""
+    parts = query.data.split("_")
+    val = f"flip_{parts[1]}" # flip_h or flip_v
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    await query.answer(f"Flipping {parts[1]}...")
+    await process_video(client, query, 'rotate', {'rotation': val})
+
+
 @bot.on_callback_query(filters.regex(r"^remove_"))
 async def remove_callback(client: Client, query: CallbackQuery):
     """Handle Remove menu"""
@@ -1076,6 +1156,22 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                     output_path = result
                 else:
                     error = result
+
+        elif operation == 'speed':
+            speed = options.get('speed', 1.0)
+            success, result = await change_speed(input_path, output_path, speed)
+            if success:
+                output_path = result
+            else:
+                error = result
+
+        elif operation == 'rotate':
+            rotation = options.get('rotation', 'right')
+            success, result = await rotate_video(input_path, output_path, rotation)
+            if success:
+                output_path = result
+            else:
+                error = result
         
         else:
             success = False

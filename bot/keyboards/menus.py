@@ -34,6 +34,10 @@ def main_menu(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("✂️ Trim", callback_data=f"trim_{user_id}"),
         ],
         [
+            InlineKeyboardButton("⏩ Speed", callback_data=f"speed_{user_id}"),
+            InlineKeyboardButton("🔄 Rotate", callback_data=f"rotate_{user_id}"),
+        ],
+        [
             InlineKeyboardButton("💾 Keep Source", callback_data=f"keepsrc_{user_id}"),
             InlineKeyboardButton("✏️ Rename", callback_data=f"rename_{user_id}"),
         ],
