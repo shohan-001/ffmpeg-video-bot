@@ -80,7 +80,8 @@ bot = Client(
     api_hash=API_HASH,
     bot_token=BOT_TOKEN,
     parse_mode=ParseMode.HTML,
-    workers=8
+    workers=8,
+    max_concurrent_transmissions=4
 )
 
 # Database connection (will be initialized on startup)
