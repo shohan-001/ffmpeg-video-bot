@@ -265,6 +265,58 @@ async def audio_format_callback(client: Client, query: CallbackQuery):
     await process_video(client, query, 'extract_audio', {'format': fmt})
 
 
+@bot.on_callback_query(filters.regex(r"^ext_video_"))
+async def extract_video_callback(client: Client, query: CallbackQuery):
+    """Extract video stream only"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.answer("Extracting video stream...")
+    await process_video(client, query, 'extract_video', {})
+
+
+@bot.on_callback_query(filters.regex(r"^ext_subs_"))
+async def extract_subs_callback(client: Client, query: CallbackQuery):
+    """Extract subtitles"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.answer("Extracting subtitles...")
+    await process_video(client, query, 'extract_subs', {})
+
+
+@bot.on_callback_query(filters.regex(r"^ext_thumb_"))
+async def extract_thumb_callback(client: Client, query: CallbackQuery):
+    """Extract thumbnail"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.answer("Extracting thumbnail...")
+    await process_video(client, query, 'extract_thumb', {})
+
+
+@bot.on_callback_query(filters.regex(r"^ext_ss_"))
+async def extract_screenshots_callback(client: Client, query: CallbackQuery):
+    """Extract screenshots"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.answer("Extracting screenshots...")
+    await process_video(client, query, 'extract_screenshots', {})
+
+
 @bot.on_callback_query(filters.regex(r"^remove_"))
 async def remove_callback(client: Client, query: CallbackQuery):
     """Handle Remove menu"""
@@ -546,7 +598,45 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
             else:
                 error = result
         
-        # More operations can be added here...
+        elif operation == 'extract_video':
+            output_path = os.path.join(output_dir, f"{base_name}_video{ext}")
+            success, result = await extract_video(input_path, output_path)
+            if success:
+                output_path = result
+            else:
+                error = result
+        
+        elif operation == 'extract_subs':
+            output_path = os.path.join(output_dir, f"{base_name}.srt")
+            success, result = await extract_subtitles(input_path, output_path)
+            if success:
+                output_path = result
+            else:
+                error = result
+        
+        elif operation == 'extract_thumb':
+            output_path = os.path.join(output_dir, f"{base_name}_thumb.jpg")
+            success, result = await extract_thumbnail(input_path, output_path)
+            if success:
+                output_path = result
+            else:
+                error = result
+        
+        elif operation == 'extract_screenshots':
+            output_path = os.path.join(output_dir, f"{base_name}_ss_%d.jpg")
+            success, result = await extract_screenshots(input_path, output_path, count=5)
+            if success:
+                # Screenshots returns a list of files
+                if isinstance(result, list) and result:
+                    output_path = result[0]  # Use first screenshot for now
+                else:
+                    output_path = result
+            else:
+                error = result
+        
+        else:
+            success = False
+            error = f"Unknown operation: {operation}"
         
         if not success:
             await status_msg.edit_text(f"❌ Error: {error[:500]}")
