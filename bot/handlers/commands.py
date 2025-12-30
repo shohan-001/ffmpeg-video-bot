@@ -4,6 +4,9 @@
 from pyrogram import Client, filters
 from pyrogram.types import Message
 import psutil
+import subprocess
+import sys
+import os
 from time import time
 
 from bot import bot, OWNER_ID, AUTHORIZED_USERS, LOGGER, user_data
@@ -201,3 +204,135 @@ async def broadcast_command(client: Client, message: Message):
         f"✅ Sent: {sent}\n"
         f"❌ Failed: {failed}"
     )
+
+
+@bot.on_message(filters.command("restart") & filters.private)
+async def restart_command(client: Client, message: Message):
+    """Handle /restart command - Owner only"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    await message.reply_text("🔄 <b>Restarting bot...</b>")
+    LOGGER.info("Restart command received")
+    
+    # Restart the bot
+    os.execl(sys.executable, sys.executable, "-m", "bot")
+
+
+@bot.on_message(filters.command("update") & filters.private)
+async def update_command(client: Client, message: Message):
+    """Handle /update command - Owner only"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    status_msg = await message.reply_text("🔄 <b>Pulling updates from GitHub...</b>")
+    
+    try:
+        # Run git pull
+        result = subprocess.run(
+            ['git', 'pull'],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        output = result.stdout or result.stderr or "No output"
+        
+        if "Already up to date" in output:
+            await status_msg.edit_text(
+                "✅ <b>Already up to date!</b>\n\n"
+                f"<code>{output[:500]}</code>"
+            )
+        elif result.returncode == 0:
+            await status_msg.edit_text(
+                "✅ <b>Update pulled successfully!</b>\n\n"
+                f"<code>{output[:500]}</code>\n\n"
+                "🔄 <b>Restarting bot...</b>"
+            )
+            LOGGER.info(f"Update pulled: {output[:100]}")
+            
+            # Restart after update
+            os.execl(sys.executable, sys.executable, "-m", "bot")
+        else:
+            await status_msg.edit_text(
+                f"❌ <b>Update failed!</b>\n\n"
+                f"<code>{output[:500]}</code>"
+            )
+            
+    except subprocess.TimeoutExpired:
+        await status_msg.edit_text("❌ <b>Update timed out!</b>")
+    except Exception as e:
+        await status_msg.edit_text(f"❌ <b>Error:</b> {str(e)[:200]}")
+
+
+@bot.on_message(filters.command("shell") & filters.private)
+async def shell_command(client: Client, message: Message):
+    """Handle /shell command - Owner only"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    if len(message.command) < 2:
+        await message.reply_text(
+            "<b>Usage:</b> <code>/shell command</code>\n\n"
+            "<b>Example:</b> <code>/shell ls -la</code>"
+        )
+        return
+    
+    cmd = message.text.split(None, 1)[1]
+    status_msg = await message.reply_text(f"⚙️ <b>Running:</b> <code>{cmd[:50]}</code>")
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        
+        output = result.stdout or result.stderr or "No output"
+        
+        # Truncate if too long
+        if len(output) > 4000:
+            output = output[:4000] + "\n...(truncated)"
+        
+        await status_msg.edit_text(
+            f"<b>Command:</b> <code>{cmd[:100]}</code>\n\n"
+            f"<b>Output:</b>\n<code>{output}</code>"
+        )
+        
+    except subprocess.TimeoutExpired:
+        await status_msg.edit_text("❌ <b>Command timed out!</b>")
+    except Exception as e:
+        await status_msg.edit_text(f"❌ <b>Error:</b> {str(e)[:200]}")
+
+
+@bot.on_message(filters.command("log") & filters.private)
+async def log_command(client: Client, message: Message):
+    """Handle /log command - Owner only"""
+    if message.from_user.id != OWNER_ID:
+        return
+    
+    log_file = "logs/bot.log"
+    
+    if not os.path.exists(log_file):
+        await message.reply_text("📝 No log file found.")
+        return
+    
+    try:
+        # Get last 50 lines
+        with open(log_file, 'r') as f:
+            lines = f.readlines()
+            last_lines = lines[-50:] if len(lines) > 50 else lines
+            log_content = ''.join(last_lines)
+        
+        if len(log_content) > 4000:
+            log_content = log_content[-4000:]
+        
+        await message.reply_text(
+            f"<b>📝 Last 50 log lines:</b>\n\n"
+            f"<code>{log_content}</code>"
+        )
+    except Exception as e:
+        await message.reply_text(f"❌ Error reading log: {e}")
+
