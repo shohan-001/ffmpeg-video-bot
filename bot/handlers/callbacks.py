@@ -10,7 +10,7 @@ from bot.keyboards.menus import (
     main_menu, encode_menu, preset_menu, resolution_menu,
     convert_menu, extract_menu, remove_menu, watermark_menu,
     watermark_position_menu, audio_format_menu, confirm_menu,
-    close_button, speed_menu, rotate_menu, after_process_menu
+    close_button, speed_menu, rotate_menu, after_process_menu, stream_selection_menu
 )
 from bot.handlers.file_handler import download_file, upload_file
 from bot.ffmpeg import *
@@ -520,15 +520,81 @@ async def extract_callback(client: Client, query: CallbackQuery):
 
 @bot.on_callback_query(filters.regex(r"^ext_audio_"))
 async def extract_audio_callback(client: Client, query: CallbackQuery):
-    """Show audio format selection"""
+    """Show audio format selection (and stream selection if needed)"""
     user_id = int(query.data.split("_")[2])
     
     if query.from_user.id != user_id:
         await query.answer("Not your button!", show_alert=True)
         return
+        
+    # Check session
+    if user_id not in user_data:
+        await query.answer("Session expired", show_alert=True)
+        return
+
+    # Ensure file downloaded
+    file_path = user_data[user_id].get('file_path')
+    if not file_path or not os.path.exists(file_path):
+        status_msg = await query.message.edit_text("⏳ Downloading video to analyze streams...")
+        orig_msg_id = user_data[user_id].get('message_id')
+        if not orig_msg_id:
+            await status_msg.edit_text("❌ Original video lost!")
+            return
+        
+        try:
+            video_msg = await client.get_messages(query.message.chat.id, orig_msg_id)
+            if not video_msg:
+                 await status_msg.edit_text("❌ Video message deleted!")
+                 return
+            file_path = await download_file(video_msg, status_msg)
+            user_data[user_id]['file_path'] = file_path
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Download failed: {e}")
+            return
+
+    # Analyze streams
+    ffmpeg = FFmpeg(file_path)
+    streams = await ffmpeg.get_streams()
+    audios = streams.get('audio', [])
+    
+    if not audios:
+        await query.message.edit_text("❌ No audio streams found!", reply_markup=extract_menu(user_id))
+        return
+        
+    if len(audios) == 1:
+        # Just one, set default and show format menu
+        user_data[user_id]['selected_audio_stream'] = 0
+        await query.message.edit_text(
+            "<b>🔊 Extract Audio</b>\n\n"
+            "Select output format:",
+            reply_markup=audio_format_menu(user_id)
+        )
+        await query.answer()
+        return
+        
+    # Multiple -> Show stream menu
+    await query.message.edit_text(
+        "<b>🔊 Select Audio Stream</b>",
+        reply_markup=stream_selection_menu(user_id, audios, 'audio')
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^selaud_"))
+async def aud_select_callback(client: Client, query: CallbackQuery):
+    """Handle audio stream selection"""
+    parts = query.data.split("_")
+    idx = int(parts[1])
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    user_data[user_id]['selected_audio_stream'] = idx
     
     await query.message.edit_text(
-        "<b>🔊 Extract Audio</b>\n\n"
+        f"<b>🔊 Extract Audio (Stream #{idx+1})</b>\n\n"
         "Select output format:",
         reply_markup=audio_format_menu(user_id)
     )
@@ -547,7 +613,11 @@ async def audio_format_callback(client: Client, query: CallbackQuery):
         return
     
     await query.answer(f"Extracting audio as {fmt}...")
-    await process_video(client, query, 'extract_audio', {'format': fmt})
+    
+    # Get selected stream index (default 0)
+    idx = user_data[user_id].get('selected_audio_stream', 0)
+    
+    await process_video(client, query, 'extract_audio', {'format': fmt, 'stream_index': idx})
 
 
 @bot.on_callback_query(filters.regex(r"^ext_video_"))
@@ -572,8 +642,70 @@ async def extract_subs_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
-    await query.answer("Extracting subtitles...")
-    await process_video(client, query, 'extract_subs', {})
+    # Check if we have file info
+    if user_id not in user_data:
+        await query.answer("Session expired. Send video again.", show_alert=True)
+        return
+    
+    # Ensure file is downloaded for analysis
+    file_path = user_data[user_id].get('file_path')
+    
+    if not file_path or not os.path.exists(file_path):
+        status_msg = await query.message.edit_text("⏳ Downloading video to analyze streams...")
+        
+        orig_msg_id = user_data[user_id].get('message_id')
+        if not orig_msg_id:
+            await status_msg.edit_text("❌ Original video found!")
+            return
+            
+        try:
+            video_msg = await client.get_messages(query.message.chat.id, orig_msg_id)
+            if not video_msg:
+                await status_msg.edit_text("❌ Video message deleted!")
+                return
+                
+            file_path = await download_file(video_msg, status_msg)
+            user_data[user_id]['file_path'] = file_path
+        except Exception as e:
+            await status_msg.edit_text(f"❌ Download failed: {e}")
+            return
+    
+    # Analyze streams
+    ffmpeg = FFmpeg(file_path)
+    streams = await ffmpeg.get_streams()
+    subs = streams.get('subtitle', [])
+    
+    if not subs:
+        await query.message.edit_text("❌ No subtitle streams found!", reply_markup=extract_menu(user_id))
+        return
+        
+    if len(subs) == 1:
+        # Just one, extract it
+        await query.answer("Extracting subtitles...")
+        await process_video(client, query, 'extract_subs', {'stream_index': 0})
+        return
+        
+    # Multiple -> Show menu
+    await query.message.edit_text(
+        "<b>📝 Select Subtitle Stream</b>",
+        reply_markup=stream_selection_menu(user_id, subs, 'subtitle')
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^selsub_"))
+async def sub_select_callback(client: Client, query: CallbackQuery):
+    """Handle subtitle stream selection"""
+    parts = query.data.split("_")
+    idx = int(parts[1])
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    await query.answer(f"Extracting stream #{idx+1}...")
+    await process_video(client, query, 'extract_subs', {'stream_index': idx})
 
 
 @bot.on_callback_query(filters.regex(r"^ext_thumb_"))
@@ -949,8 +1081,9 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         
         elif operation == 'extract_audio':
             fmt = options.get('format', 'mp3')
-            output_path = os.path.join(output_dir, f"{base_name}.{fmt}")
-            success, result = await extract_audio(input_path, output_path, codec=fmt)
+            idx = int(options.get('stream_index', 0))
+            output_path = os.path.join(output_dir, f"{base_name}_track{idx}.{fmt}")
+            success, result = await extract_audio(input_path, output_path, stream_index=idx, codec=fmt)
             if success:
                 output_path = result
             else:
@@ -964,16 +1097,18 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 error = result
         
         elif operation == 'extract_video':
-            output_path = os.path.join(output_dir, f"{base_name}_video{ext}")
-            success, result = await extract_video(input_path, output_path)
+            idx = int(options.get('stream_index', 0))
+            output_path = os.path.join(output_dir, f"{base_name}_video{idx}{ext}")
+            success, result = await extract_video(input_path, output_path, stream_index=idx)
             if success:
                 output_path = result
             else:
                 error = result
         
         elif operation == 'extract_subs':
-            output_path = os.path.join(output_dir, f"{base_name}.srt")
-            success, result = await extract_subtitles(input_path, output_path)
+            idx = int(options.get('stream_index', 0))
+            output_path = os.path.join(output_dir, f"{base_name}_track{idx}.srt")
+            success, result = await extract_subtitles(input_path, output_path, stream_index=idx)
             if success:
                 output_path = result
             else:

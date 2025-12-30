@@ -151,6 +151,31 @@ def extract_menu(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+def stream_selection_menu(user_id: int, streams: list, stream_type: str) -> InlineKeyboardMarkup:
+    """Menu to select a specific stream"""
+    buttons = []
+    
+    # Callback prefix based on type
+    prefix = "selsub" if stream_type == 'subtitle' else "selaud"
+    
+    for i, stream in enumerate(streams):
+        # Format label
+        lang = stream.get('tags', {}).get('language', 'und')
+        codec = stream.get('codec_name', 'unk')
+        title = stream.get('tags', {}).get('title', '')
+        
+        label = f"{i+1}. {lang} ({codec})"
+        if title:
+            # Clean title
+            title = title[:20].strip()
+            label += f" - {title}"
+            
+        buttons.append([InlineKeyboardButton(label, callback_data=f"{prefix}_{i}_{user_id}")])
+        
+    buttons.append([InlineKeyboardButton("🔙 Back", callback_data=f"extract_{user_id}")])
+    return InlineKeyboardMarkup(buttons)
+
+
 def remove_menu(user_id: int) -> InlineKeyboardMarkup:
     """Stream removal menu"""
     buttons = [
