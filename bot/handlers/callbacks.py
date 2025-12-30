@@ -1140,10 +1140,13 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         # Get the original message
         video_msg = await client.get_messages(query.message.chat.id, original_msg)
         
-        # Download video
-        await status_msg.edit_text("📥 Downloading video...")
-        input_path = await download_file(video_msg, status_msg)
-        user_data[user_id]['file_path'] = input_path
+        # Check if file already downloaded
+        input_path = user_data[user_id].get('file_path')
+        if not input_path or not os.path.exists(input_path):
+            # Download video
+            await status_msg.edit_text("📥 Downloading video...")
+            input_path = await download_file(video_msg, status_msg)
+            user_data[user_id]['file_path'] = input_path
         
         # Generate output path
         base_name = os.path.splitext(os.path.basename(input_path))[0]
