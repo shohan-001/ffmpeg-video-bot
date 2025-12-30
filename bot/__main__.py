@@ -4,7 +4,7 @@
 import asyncio
 from pyrogram import idle
 from bot import bot, LOGGER, MONGO_URI, DATABASE_NAME, OWNER_ID, db
-from bot.utils.database import Database
+from bot.utils.db_handler import Database
 
 async def main():
     """Main function to start the bot"""
