@@ -176,6 +176,55 @@ async def handle_text_input(client: Client, message: Message):
             reply_markup=watermark_menu(user_id)
         )
 
+    elif waiting_for == 'ss_count':
+        try:
+            count = int(text)
+            if count <= 0:
+                raise ValueError
+        except:
+            await message.reply_text("❌ Invalid number. Please enter a positive integer.")
+            return
+            
+        user_data[user_id]['waiting_for'] = None
+        
+        await message.reply_text(f"✅ Screenshot count set to {count}. Processing...", quote=True)
+        await process_video(client, MockQuery(message, user), 'extract_screenshots', {'count': count})
+
+    elif waiting_for == 'sample_duration':
+        # Can accept "30", "30s", "10"
+        val = text.lower().replace('s', '').strip()
+        try:
+            duration = int(val)
+            if duration <= 0:
+                raise ValueError
+        except:
+            await message.reply_text("❌ Invalid duration. Please enter a positive number of seconds.")
+            return
+            
+        # Store duration, ask for start type
+        user_data[user_id]['sample_duration'] = duration
+        user_data[user_id]['waiting_for'] = None
+        
+        # Show Start Menu
+        from bot.keyboards.menus import sample_start_menu
+        await message.reply_text(
+            f"✅ Duration set to {duration}s.\n\nNow select start time:",
+            reply_markup=sample_start_menu(user_id)
+        )
+
+    elif waiting_for == 'sample_start':
+        # Expect timestamp 00:00:10
+        start_time = text.strip()
+        user_data[user_id]['sample_start'] = start_time
+        user_data[user_id]['waiting_for'] = None
+        
+        # Determine duration from stored
+        duration = user_data[user_id].get('sample_duration', 30)
+        
+        await message.reply_text(f"⏳ Generating {duration}s sample starting at {start_time}...", quote=True)
+        await process_video(client, MockQuery(message, user), 'generate_sample', 
+                            {'duration': duration, 'start': start_time})
+
 
 # Helper for mocking CallbackQuery
 class MockMessage:

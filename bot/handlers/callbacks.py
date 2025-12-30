@@ -10,7 +10,8 @@ from bot.keyboards.menus import (
     main_menu, encode_menu, preset_menu, resolution_menu,
     convert_menu, extract_menu, remove_menu, watermark_menu,
     watermark_position_menu, audio_format_menu, confirm_menu,
-    close_button, speed_menu, rotate_menu, after_process_menu, stream_selection_menu
+    close_button, speed_menu, rotate_menu, after_process_menu, stream_selection_menu,
+    screenshot_count_menu, sample_duration_menu, sample_start_menu
 )
 from bot.handlers.file_handler import download_file, upload_file
 from bot.ffmpeg import *
@@ -723,15 +724,107 @@ async def extract_thumb_callback(client: Client, query: CallbackQuery):
 
 @bot.on_callback_query(filters.regex(r"^ext_ss_"))
 async def extract_screenshots_callback(client: Client, query: CallbackQuery):
-    """Extract screenshots"""
+    """Show screenshot count menu"""
     user_id = int(query.data.split("_")[2])
     
     if query.from_user.id != user_id:
         await query.answer("Not your button!", show_alert=True)
         return
     
-    await query.answer("Extracting screenshots...")
-    await process_video(client, query, 'extract_screenshots', {})
+    await query.message.edit_text(
+        "<b>📸 Screenshots</b>\n\nHow many screenshots do you want?",
+        reply_markup=screenshot_count_menu(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^sscnt_"))
+async def screenshot_count_callback(client: Client, query: CallbackQuery):
+    """Handle screenshot count selection"""
+    parts = query.data.split("_")
+    val = parts[1]
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    if val == 'custom':
+        user_data[user_id]['waiting_for'] = 'ss_count'
+        await query.message.edit_text("✍️ Enter number of screenshots (e.g. 15):")
+        await query.answer()
+        return
+        
+    count = int(val)
+    await query.answer(f"Generating {count} screenshots...")
+    await process_video(client, query, 'extract_screenshots', {'count': count})
+
+
+@bot.on_callback_query(filters.regex(r"^ext_sample_"))
+async def sample_video_callback(client: Client, query: CallbackQuery):
+    """Show sample video menu"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    await query.message.edit_text(
+        "<b>🎞️ Sample Video</b>\n\nSelect duration:",
+        reply_markup=sample_duration_menu(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^sample_"))
+async def sample_duration_callback(client: Client, query: CallbackQuery):
+    """Handle sample duration selection"""
+    parts = query.data.split("_")
+    val = parts[1]
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    if val == 'custom':
+        user_data[user_id]['waiting_for'] = 'sample_duration'
+        await query.message.edit_text("✍️ Enter duration in seconds (e.g. 45):")
+        await query.answer()
+        return
+
+    duration = int(val)
+    user_data[user_id]['sample_duration'] = duration
+    
+    # Show start menu
+    await query.message.edit_text(
+        f"✅ Duration: {duration}s\n\nSelect start time:",
+        reply_markup=sample_start_menu(user_id)
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^samplestart_"))
+async def sample_start_callback(client: Client, query: CallbackQuery):
+    """Handle sample start selection"""
+    parts = query.data.split("_")
+    val = parts[1]
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    if val == 'custom':
+        user_data[user_id]['waiting_for'] = 'sample_start'
+        await query.message.edit_text("✍️ Enter start time (e.g. 00:05:30 or 120):")
+        await query.answer()
+        return
+        
+    # Random
+    duration = user_data[user_id].get('sample_duration', 30)
+    await query.answer("Generating sample with random start...")
+    await process_video(client, query, 'generate_sample', {'duration': duration, 'start': 'random'})
 
 
 @bot.on_callback_query(filters.regex(r"^speed_"))
@@ -1123,14 +1216,61 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 error = result
         
         elif operation == 'extract_screenshots':
-            output_path = os.path.join(output_dir, f"{base_name}_ss_%d.jpg")
-            success, result = await extract_screenshots(input_path, output_path, count=5)
+            count = int(options.get('count', 5))
+            # Pattern for ffmpeg
+            output_pattern = os.path.join(output_dir, f"{base_name}_ss_%03d.jpg")
+            # Actual list logic handles %d or %03d?
+            # extract_screenshots in extract.py takes output_dir and joins filename.
+            # wait, extract_screenshots signature: (input, output_dir, count)
+            # It generates filenames internally: screenshot_{i:02d}.jpg
+            
+            # Correct usage: pass output_dir, not pattern
+            # But process_video defines output_dir. 
+            # I should pass a specific sub-folder to avoid clutter?
+            ss_dir = os.path.join(output_dir, f"screenshots_{user_id}")
+            success, result = await extract_screenshots(input_path, ss_dir, count=count)
+            
             if success:
-                # Screenshots returns a list of files
-                if isinstance(result, list) and result:
-                    output_path = result[0]  # Use first screenshot for now
-                else:
-                    output_path = result
+                # result is list of paths
+                # Zip them
+                import zipfile
+                zip_path = os.path.join(output_dir, f"{base_name}_screenshots.zip")
+                with zipfile.ZipFile(zip_path, 'w') as zf:
+                    for f in result:
+                        zf.write(f, os.path.basename(f))
+                        os.remove(f) # Clean up individual files
+                try:
+                    os.rmdir(ss_dir)
+                except:
+                    pass
+                output_path = zip_path
+            else:
+                error = "Failed to extract screenshots"
+
+        elif operation == 'generate_sample':
+            duration = int(options.get('duration', 30))
+            start_opt = options.get('start', 'random')
+            
+            start = "0"
+            if start_opt == 'random':
+                # Get duration
+                ff = FFmpeg(input_path)
+                total = await ff.get_duration()
+                
+                import random
+                if total > duration:
+                    # Random start
+                    start_sec = random.randint(0, int(total - duration))
+                    start = str(start_sec)
+            else:
+                start = str(start_opt)
+                
+            output_path = os.path.join(output_dir, f"{base_name}_sample_{duration}s{ext}")
+            
+            # Use trim_video
+            success, result = await trim_video(input_path, output_path, start_time=start, duration=str(duration))
+            if success:
+                output_path = result
             else:
                 error = result
 

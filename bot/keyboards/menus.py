@@ -143,9 +143,63 @@ def extract_menu(user_id: int) -> InlineKeyboardMarkup:
         ],
         [
             InlineKeyboardButton("📸 Screenshots", callback_data=f"ext_ss_{user_id}"),
+            InlineKeyboardButton("🎞️ Sample Video", callback_data=f"ext_sample_{user_id}"),
         ],
         [
             InlineKeyboardButton("🔙 Back", callback_data=f"main_{user_id}"),
+        ],
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+
+def screenshot_count_menu(user_id: int) -> InlineKeyboardMarkup:
+    """Menu to select number of screenshots"""
+    buttons = [
+        [
+            InlineKeyboardButton("3", callback_data=f"sscnt_3_{user_id}"),
+            InlineKeyboardButton("5", callback_data=f"sscnt_5_{user_id}"),
+            InlineKeyboardButton("7", callback_data=f"sscnt_7_{user_id}"),
+            InlineKeyboardButton("10", callback_data=f"sscnt_10_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("✍️ Custom Amount", callback_data=f"sscnt_custom_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data=f"extract_{user_id}"),
+        ],
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+
+def sample_duration_menu(user_id: int) -> InlineKeyboardMarkup:
+    """Menu to select sample video duration"""
+    buttons = [
+        [
+            InlineKeyboardButton("10s", callback_data=f"sample_10_{user_id}"),
+            InlineKeyboardButton("30s", callback_data=f"sample_30_{user_id}"),
+            InlineKeyboardButton("60s", callback_data=f"sample_60_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("✍️ Custom Duration", callback_data=f"sample_custom_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data=f"extract_{user_id}"),
+        ],
+    ]
+    return InlineKeyboardMarkup(buttons)
+
+
+def sample_start_menu(user_id: int) -> InlineKeyboardMarkup:
+    """Menu to select sample start time"""
+    buttons = [
+        [
+            InlineKeyboardButton("🔀 Random Start", callback_data=f"samplestart_random_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("⏱️ Custom Start", callback_data=f"samplestart_custom_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("🔙 Back", callback_data=f"extract_{user_id}"),
         ],
     ]
     return InlineKeyboardMarkup(buttons)
