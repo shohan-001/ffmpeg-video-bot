@@ -12,14 +12,18 @@ from os import environ, path, makedirs
 load_dotenv('config.env', override=True)
 
 # Setup logging
+log_handlers = [logging.StreamHandler()]
+try:
+    makedirs('logs', exist_ok=True)
+    log_handlers.append(logging.FileHandler('logs/bot.log'))
+except Exception:
+    pass  # Continue with console logging only
+
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] [%(levelname)s] - %(message)s',
     datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[
-        logging.FileHandler('bot.log'),
-        logging.StreamHandler()
-    ]
+    handlers=log_handlers
 )
 LOGGER = logging.getLogger(__name__)
 

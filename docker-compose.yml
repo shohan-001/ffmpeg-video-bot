@@ -9,7 +9,7 @@ services:
       - ./downloads:/app/downloads
       - ./outputs:/app/outputs
       - ./config.env:/app/config.env:ro
-      - ./bot.log:/app/bot.log
+      - ./logs:/app/logs
     environment:
       - TZ=Asia/Kolkata
     networks:
