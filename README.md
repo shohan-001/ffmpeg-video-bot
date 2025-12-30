@@ -137,6 +137,10 @@ python3 -m bot
 | `/ping` | Check bot latency |
 | `/stats` | Bot statistics (owner only) |
 | `/broadcast` | Broadcast message (owner only) |
+| `/update` | Update bot from git (owner only) |
+| `/restart` | Restart the bot (owner only) |
+| `/log` | View bot logs (owner only) |
+| `/shell` | Run shell commands (owner only) |
 
 ## Usage
 
