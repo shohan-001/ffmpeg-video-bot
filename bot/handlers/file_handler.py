@@ -220,7 +220,7 @@ async def download_file(message: Message, status_msg: Message, user_id: int = No
     file_path = os.path.join(user_dir, file_name)
     
     # Create progress with cancel button
-    progress = Progress(status_msg, "📥 Downloading", user_id=uid)
+    progress = Progress(status_msg, "📥 Downloading", user_id=uid, filename=file_name)
     
     # Store progress instance for cancellation
     if uid in user_data:
@@ -258,14 +258,19 @@ async def upload_file(client: Client, chat_id: int, file_path: str | list, statu
             raise e
         return
 
-    progress = Progress(status_msg, "📤 Uploading", user_id=user_id)
+        return
+    
+    file_name = os.path.basename(file_path) if isinstance(file_path, str) else "Album"
+    progress = Progress(status_msg, "📤 Uploading", user_id=user_id, filename=file_name)
     
     # Store progress for cancellation
     if user_id and user_id in user_data:
         user_data[user_id]['progress'] = progress
     
-    file_size = os.path.getsize(file_path)
-    file_name = os.path.basename(file_path)
+    file_size = 0  # Will be set below or calculated
+    if isinstance(file_path, str):
+         file_size = os.path.getsize(file_path)
+         # file_name already set
     
     # Decide upload method based on file type
     video_exts = ['.mp4', '.mkv', '.avi', '.mov', '.webm']

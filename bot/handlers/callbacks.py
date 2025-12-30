@@ -1158,7 +1158,7 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
         
         # Get duration for progress
         duration = await FFmpeg(input_path).get_duration()
-        progress = FFmpegProgress(status_msg, duration, f"Processing ({operation})")
+        progress = FFmpegProgress(status_msg, duration, f"Processing ({operation})", filename=os.path.basename(input_path))
         
         await status_msg.edit_text(f"⚙️ Processing: {operation}...")
         
