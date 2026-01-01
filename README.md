@@ -1,4 +1,4 @@
-# FFmpeg Processor Bot V2.0 🚀
+# FFmpeg Processor Bot V2.0.0 🚀
 
 [![Deploy](https://www.herokucdn.com/deploy/button.svg)](https://heroku.com/deploy)
 
