@@ -156,6 +156,9 @@ async def settings_command(client: Client, message: Message):
     db = get_db()
     if db:
         await db.add_user(user.id, user.username, user.first_name)
+    else:
+        await message.reply_text("❌ <b>Database not connected.</b>\nCannot access settings.")
+        return
     
     from bot.keyboards.settings_menu import open_settings
     menu = await open_settings(user.id)
