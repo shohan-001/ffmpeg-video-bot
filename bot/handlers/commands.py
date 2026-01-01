@@ -614,8 +614,19 @@ async def dl_command(client: Client, message: Message):
         await handle_video(client, msg)
     elif msg.audio:
         await handle_audio(client, msg)
+    elif msg.text and (msg.text.startswith("http") or "http" in msg.text):
+        # Extract URL logic
+        url = msg.text
+        if "http" in url and not url.startswith("http"):
+             # Simple extraction if mixed with text, though user usually sends just link
+             # For now assume mostly link
+             # Grab first http match or just pass text
+             pass
+        
+        from bot.handlers.file_handler import handle_url_logic
+        await handle_url_logic(client, msg, url)
     else:
-        await message.reply_text("❌ Unsupported media type.")
+        await message.reply_text("❌ Unsupported media type. Reply to Video, Audio, or URL.")
 
 
 @bot.on_message(filters.command("speedtest") & filters.private)
