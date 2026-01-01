@@ -114,15 +114,6 @@ class Database:
         }
 
 
-# Global database instance
-db_instance: Database = None
-
-async def init_database(uri: str, database_name: str) -> Database:
-    """Initialize database connection"""
-    global db_instance
-    db_instance = Database(uri, database_name)
-    await db_instance.connect()
-    return db_instance
 
     async def update_setting(self, user_id: int, key: str, value: any):
         """Update a specific setting"""
@@ -177,6 +168,16 @@ async def init_database(uri: str, database_name: str) -> Database:
             {"_id": user_id},
             {"$set": {"thumbnail": file_id}}
         )
+
+# Global database instance
+db_instance: Database = None
+
+async def init_database(uri: str, database_name: str) -> Database:
+    """Initialize database connection"""
+    global db_instance
+    db_instance = Database(uri, database_name)
+    await db_instance.connect()
+    return db_instance
 
     # Log Channel (Global Setting or Per User?)
     # Reference bot has a global log channel defined in config, but maybe we can store per-user logs?
