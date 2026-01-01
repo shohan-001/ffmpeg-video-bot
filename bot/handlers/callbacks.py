@@ -70,6 +70,9 @@ async def ffcmd_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+        
     user_data[user_id]['operation'] = 'ffmpeg_cmd'
     user_data[user_id]['waiting_for'] = 'ffmpeg_cmd'
     
@@ -92,6 +95,9 @@ async def vidvid_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['operation'] = 'merge_video'
     user_data[user_id]['waiting_for'] = 'second_video'
     
@@ -130,6 +136,9 @@ async def subintro_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['operation'] = 'sub_intro'
     user_data[user_id]['waiting_for'] = 'sub_intro_text'
     
@@ -178,6 +187,9 @@ async def metadata_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['operation'] = 'metadata'
     user_data[user_id]['waiting_for'] = 'metadata_input'
     
@@ -203,6 +215,9 @@ async def encode_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['operation'] = 'encode'
     
     # Show current encode settings
@@ -248,6 +263,9 @@ async def crf_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['waiting_for'] = 'enc_crf'
     
     await query.message.edit_text(
@@ -270,6 +288,9 @@ async def vcodec_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['waiting_for'] = 'enc_vcodec'
     
     await query.message.edit_text(
@@ -290,6 +311,9 @@ async def acodec_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['waiting_for'] = 'enc_acodec'
     
     await query.message.edit_text(
@@ -1806,6 +1830,9 @@ async def rename_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
         
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['operation'] = 'rename'
     user_data[user_id]['waiting_for'] = 'new_filename'
     
@@ -1887,6 +1914,9 @@ async def set_thumb_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
         
+    if user_id not in user_data:
+        user_data[user_id] = {}
+
     user_data[user_id]['waiting_for'] = 'set_thumbnail'
     
     await query.message.edit_text(
@@ -2019,6 +2049,9 @@ async def set_audio_codec_menu_callback(client: Client, query: CallbackQuery):
     """Audio Codec Menu"""
     # Just simple prompt for now or menu
     user_id = query.from_user.id
+    if user_id not in user_data:
+        user_data[user_id] = {}
+        
     user_data[user_id]['waiting_for'] = 'enc_acodec'
     await query.message.edit_text(
         "<b>🔊 Set Audio Codec</b>\nSend codec name (e.g. <code>aac</code>, <code>libmp3lame</code>)",
@@ -2031,6 +2064,9 @@ async def set_channels_menu_callback(client: Client, query: CallbackQuery):
     """Audio Channels Menu"""
     # Simple prompt
     user_id = query.from_user.id
+    if user_id not in user_data:
+        user_data[user_id] = {}
+        
     user_data[user_id]['waiting_for'] = 'enc_channels'
     await query.message.edit_text(
         "<b>🔊 Set Audio Channels</b>\nSend number (e.g. <code>2.0</code>, <code>5.1</code>)",
