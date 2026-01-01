@@ -6,7 +6,6 @@ from random import choice
 from typing import Optional
 
 import cloudscraper
-import lk21
 import requests
 from bs4 import BeautifulSoup
 import logging
@@ -22,65 +21,31 @@ def direct_link_generator(text_url: str) -> Optional[str]:
     Ports logic from reference bot
     """
     if 'youtube.com' in text_url or 'youtu.be' in text_url:
-        # We handle YouTube separately via yt-dlp
         return None
         
     try:
-        if 'zippyshare.com' in text_url:
-            return zippy_share(text_url)
-        elif 'yadi.sk' in text_url:
+        if 'yadi.sk' in text_url:
             return yandex_disk(text_url)
-        elif 'cloud.mail.ru' in text_url:
-            return cm_ru(text_url)
         elif 'mediafire.com' in text_url:
             return mediafire(text_url)
         elif 'osdn.net' in text_url:
             return osdn(text_url)
         elif 'github.com' in text_url:
             return github(text_url)
-        elif 'hxfile.co' in text_url:
-            return hxfile(text_url)
-        elif 'anonfiles.com' in text_url:
-            return anonfiles(text_url)
-        elif 'letsupload.io' in text_url:
-            return letsupload(text_url)
-        elif 'fembed.net' in text_url or 'fembed.com' in text_url or 'femax20.com' in text_url or 'fcdn.stream' in text_url or 'feurl.com' in text_url:
-            return fembed(text_url)
-        elif 'sbembed.com' in text_url or 'streamsb.net' in text_url or 'sbplay.org' in text_url:
-            return sbembed(text_url)
         elif '1drv.ms' in text_url:
             return onedrive(text_url)
         elif 'pixeldrain.com' in text_url:
             return pixeldrain(text_url)
-        elif 'antfiles.com' in text_url:
-            return antfiles(text_url)
-        elif 'streamtape.com' in text_url:
-            return streamtape(text_url)
         elif '1fichier.com' in text_url:
             return fichier(text_url)
         elif 'solidfiles.com' in text_url:
             return solidfiles(text_url)
         else:
-            return None # Not supported by custom logic, maybe try generic or yt-dlp
+            return None 
     except Exception as e:
         LOGGER.error(f"DDL Generation failed for {text_url}: {e}")
         return None
 
-
-def zippy_share(url: str) -> str:
-    # Note: Zippyshare is mostly dead but keeping legacy support just in case
-    try:
-        link = re.findall("https:/.(.*?).zippyshare", url)[0]
-        response_content = (requests.get(url)).content
-        bs_obj = BeautifulSoup(response_content, "lxml")
-        js_script = bs_obj.find("div", {"class": "center", }).find_all("script")[1]
-        js_content = re.findall(r'\.href.=."/(.*?)";', str(js_script))
-        js_content = 'var x = "/' + js_content[0] + '"'
-        # Simple eval without js2py if possible, or use simplified logic
-        # For now, placeholder as Zippyshare is down
-        return None
-    except Exception:
-        return None
 
 def yandex_disk(url: str) -> str:
     try:
@@ -93,10 +58,6 @@ def yandex_disk(url: str) -> str:
         return dl_url
     except KeyError:
         return None
-
-def cm_ru(url: str) -> str:
-    # Requires external script usually, skipping for now unless critical
-    return None
 
 def mediafire(url: str) -> str:
     try:
@@ -143,45 +104,6 @@ def onedrive(link: str) -> str:
         return None
     return resp.next.url
 
-def hxfile(url: str) -> str:
-    try:
-        bypasser = lk21.Bypass()
-        return bypasser.bypass_filesIm(url)
-    except: return None
-
-def anonfiles(url: str) -> str:
-    try:
-        bypasser = lk21.Bypass()
-        return bypasser.bypass_anonfiles(url)
-    except: return None
-
-def letsupload(url: str) -> str:
-    try:
-        link = re.findall(r'\bhttps?://.*letsupload\.io\S+', url)[0]
-        bypasser = lk21.Bypass()
-        return bypasser.bypass_url(link)
-    except: return None
-
-def fembed(link: str) -> str:
-    try:
-        bypasser = lk21.Bypass()
-        dl_url = bypasser.bypass_fembed(link)
-        # Return highest quality
-        if isinstance(dl_url, dict):
-            # Sort keys implies quality?
-            return dl_url[max(dl_url.keys())] # Assuming keys are resolution or similar
-        return dl_url
-    except: return None
-
-def sbembed(link: str) -> str:
-    try:
-        bypasser = lk21.Bypass()
-        dl_url = bypasser.bypass_sbembed(link)
-        if isinstance(dl_url, dict):
-             return dl_url[max(dl_url.keys())]
-        return dl_url
-    except: return None
-
 def pixeldrain(url: str) -> str:
     url = url.strip("/ ")
     file_id = url.split("/")[-1]
@@ -191,18 +113,6 @@ def pixeldrain(url: str) -> str:
     if resp.get("success"):
         return dl_link
     return None
-
-def antfiles(url: str) -> str:
-    try:
-        bypasser = lk21.Bypass()
-        return bypasser.bypass_antfiles(url)
-    except: return None
-
-def streamtape(url: str) -> str:
-    try:
-        bypasser = lk21.Bypass()
-        return bypasser.bypass_streamtape(url)
-    except: return None
 
 def fichier(link: str) -> str:
     # 1Fichier requires more complex handling, simplified check

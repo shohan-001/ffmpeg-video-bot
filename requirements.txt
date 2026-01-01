@@ -17,6 +17,6 @@ cloudscraper
 requests
 js2py
 hachoir
-lk21
+hachoir
 patool
 speedtest-cli
