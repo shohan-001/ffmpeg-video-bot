@@ -322,10 +322,19 @@ def confirm_menu(user_id: int, action: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
+
 def close_button(user_id: int) -> InlineKeyboardMarkup:
     """Simple close button"""
     return InlineKeyboardMarkup([[
         InlineKeyboardButton("Close", callback_data=f"close_{user_id}")
+    ]])
+
+
+def back_and_close_button(user_id: int, back_data: str) -> InlineKeyboardMarkup:
+    """Back and Close buttons"""
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("🔙 Back", callback_data=back_data),
+        InlineKeyboardButton("❌ Close", callback_data=f"close_{user_id}")
     ]])
 
 

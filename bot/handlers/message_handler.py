@@ -15,7 +15,12 @@ async def handle_text_input(client: Client, message: Message):
     user = message.from_user
     user_id = user.id
     
+    # Debug log
+    # LOGGER.info(f"Received text from {user_id}: {message.text}")
+    
     if user_id not in user_data:
+        # If user sends text but has no session, ignore or maybe reply?
+        # For now, silently ignore as it might be random chat
         return
         
     waiting_for = user_data[user_id].get('waiting_for')
@@ -24,9 +29,30 @@ async def handle_text_input(client: Client, message: Message):
         return
         
     text = message.text
+    LOGGER.info(f"Processing input '{text}' for state '{waiting_for}' from user {user_id}")
     
+    # Mock classes for reusing callback logic
+    class MockMessage:
+        def __init__(self, msg):
+            self.chat = msg.chat
+            self.id = msg.id
+            self._msg = msg
+            
+        async def edit_text(self, text, reply_markup=None):
+            return await self._msg.reply_text(text, reply_markup=reply_markup)
+        
+        async def delete(self):
+            pass 
+
+    class MockQuery:
+        def __init__(self, msg, user):
+            self.message = MockMessage(msg)
+            self.from_user = user
+            self.data = f"mock_{user.id}"
+
     # Handle different inputs
     if waiting_for == 'metadata_input':
+        # ... logic ...
         # Parse metadata input
         # Format: key: value
         metadata = {}
@@ -51,37 +77,6 @@ async def handle_text_input(client: Client, message: Message):
             "Starting process...",
             quote=True
         )
-        # Start processing
-        # We need to construct a fake query object or refactor process_video to handle message
-        # Since process_video expects a query mainly for editing the message, 
-        # we can't easily reuse it without a query. 
-        # But wait, we can pass a dummy query-like object or just call the logic.
-        # Actually, let's just trigger it via a new status message.
-        
-        # NOTE: Refactoring process_video to accept status_message instead of query is better,
-        # but for now let's hack it or call a wrapper.
-        
-        # IMPORTANT: process_video uses query.message.edit_text. 
-        # We can pass a MockQuery object.
-        
-        class MockMessage:
-            def __init__(self, msg):
-                self.chat = msg.chat
-                self.id = msg.id
-                self._msg = msg
-                
-            async def edit_text(self, text, reply_markup=None):
-                return await self._msg.reply_text(text, reply_markup=reply_markup)
-            
-            async def delete(self):
-                pass # Can't delete the user's message usually, or we don't want to.
-
-        class MockQuery:
-            def __init__(self, msg, user):
-                self.message = MockMessage(msg)
-                self.from_user = user
-                self.data = f"mock_{user.id}"
-                
         await process_video(client, MockQuery(message, user), 'metadata', {'metadata': metadata})
 
     elif waiting_for == 'ffmpeg_cmd':
@@ -103,8 +98,6 @@ async def handle_text_input(client: Client, message: Message):
         user_data[user_id]['watermark_text'] = text
         user_data[user_id]['waiting_for'] = None
         
-        # Ask for position/settings or just apply default?
-        # Let's update settings and show watermark menu again
         if 'watermark_settings' not in user_data[user_id]:
             user_data[user_id]['watermark_settings'] = {}
         user_data[user_id]['watermark_settings']['text'] = text
@@ -225,22 +218,3 @@ async def handle_text_input(client: Client, message: Message):
         await process_video(client, MockQuery(message, user), 'generate_sample', 
                             {'duration': duration, 'start': start_time})
 
-
-# Helper for mocking CallbackQuery
-class MockMessage:
-    def __init__(self, msg):
-        self.chat = msg.chat
-        self.id = msg.id
-        self._msg = msg
-        
-    async def edit_text(self, text, reply_markup=None):
-        return await self._msg.reply_text(text, reply_markup=reply_markup)
-    
-    async def delete(self):
-        pass 
-
-class MockQuery:
-    def __init__(self, msg, user):
-        self.message = MockMessage(msg)
-        self.from_user = user
-        self.data = f"mock_{user.id}"
