@@ -1001,9 +1001,14 @@ async def handle_document_upload(client: Client, message: Message):
                 if 'web' in creds_json or 'installed' in creds_json:
                     await status_msg.edit_text(
                         "❌ <b>Incorrect File Type</b>\n\n"
-                        "You uploaded an <b>OAuth Client ID</b> file.\n"
-                        "Please create a <b>Service Account</b> instead:\n"
-                        "IAM & Admin > Service Accounts > Create > Keys > JSON"
+                        "You uploaded an <b>OAuth Client ID</b> (Desktop App) file.\n"
+                        "This bot needs a <b>Service Account</b> to run autonomously.\n\n"
+                        "<b>How to fix:</b>\n"
+                        "1. Go to <a href='https://console.cloud.google.com/iam-admin/serviceaccounts'>Service Accounts Dashboard</a>\n"
+                        "2. Click <b>+ CREATE SERVICE ACCOUNT</b>\n"
+                        "3. Click on the created account email\n"
+                        "4. Go to <b>KEYS</b> tab → <b>ADD KEY</b> → <b>JSON</b>\n"
+                        "5. Upload THAT file here."
                     )
                 else:
                     await status_msg.edit_text(
