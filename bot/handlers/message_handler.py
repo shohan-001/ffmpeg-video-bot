@@ -10,6 +10,30 @@ from bot import bot, user_data, LOGGER, AUTHORIZED_GROUPS
 from bot.keyboards.menus import main_menu, close_button, confirm_menu, encode_menu, watermark_menu, after_process_menu
 from bot.handlers.callbacks import process_video
 
+
+# Mock classes for reusing callback logic (must be at module level for import)
+class MockMessage:
+    def __init__(self, msg):
+        self.chat = msg.chat
+        self.id = msg.id
+        self._msg = msg
+        
+    async def edit_text(self, text, reply_markup=None):
+        return await self._msg.reply_text(text, reply_markup=reply_markup)
+    
+    async def delete(self):
+        pass 
+
+
+class MockQuery:
+    def __init__(self, msg, user):
+        self.message = MockMessage(msg)
+        self.from_user = user
+        self.data = f"mock_{user.id}"
+    
+    async def answer(self, text=None, show_alert=False):
+        pass  # Callback queries have answer method
+
 @bot.on_message(filters.text & ~filters.command(["start", "help", "settings", "stats", "ping", "update", "restart", "shell", "log", "broadcast"]))
 async def handle_text_input(client: Client, message: Message):
     """Handle text input for various operations"""
@@ -49,25 +73,6 @@ async def handle_text_input(client: Client, message: Message):
         text = message.text
         LOGGER.info(f"Processing input '{text}' for state '{waiting_for}' from user {user_id}")
         
-        # Mock classes for reusing callback logic
-        class MockMessage:
-            def __init__(self, msg):
-                self.chat = msg.chat
-                self.id = msg.id
-                self._msg = msg
-                
-            async def edit_text(self, text, reply_markup=None):
-                return await self._msg.reply_text(text, reply_markup=reply_markup)
-            
-            async def delete(self):
-                pass 
-
-        class MockQuery:
-            def __init__(self, msg, user):
-                self.message = MockMessage(msg)
-                self.from_user = user
-                self.data = f"mock_{user.id}"
-
         # Handle different inputs
         if waiting_for == 'metadata_input':
             # Parse metadata input
