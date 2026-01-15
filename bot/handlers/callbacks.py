@@ -2003,7 +2003,8 @@ async def upload_gdrive_callback(client: Client, query: CallbackQuery):
             except:
                 pass
         else:
-            await status_msg.edit_text(f"❌ Upload failed: {result[:200]}")
+            import html
+            await status_msg.edit_text(f"❌ Upload failed: {html.escape(str(result))[:300]}")
             
     except Exception as e:
         LOGGER.error(f"GDrive upload error: {e}")
