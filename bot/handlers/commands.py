@@ -816,15 +816,19 @@ async def cookies_command(client: Client, message: Message):
         await message.reply_text("❌ Unknown action. Use <code>/cookies set</code>, <code>/cookies test</code>, or <code>/cookies clear</code>")
 
 
-@bot.on_message(filters.document & filters.private)
+@bot.on_message(filters.document & filters.private, group=2)
 async def handle_document_upload(client: Client, message: Message):
-    """Handle document uploads for cookies and credentials"""
+    """Handle document uploads for cookies and credentials only"""
     user = message.from_user
     
     if user.id not in user_data:
         return
     
     waiting_for = user_data[user.id].get('waiting_for')
+    
+    # Only handle cookies and gdrive credentials, let other handlers process other docs
+    if waiting_for not in ['cookies_file', 'gdrive_credentials']:
+        return
     
     if waiting_for == 'cookies_file':
         # Handle cookies.txt upload
