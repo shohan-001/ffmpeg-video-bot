@@ -2,10 +2,21 @@
 """Callback query handlers for inline buttons"""
 
 import os
+from types import SimpleNamespace
 from pyrogram import Client, filters
 from pyrogram.types import CallbackQuery, Message
 
-from bot import bot, OWNER_ID, DOWNLOAD_DIR, OUTPUT_DIR, LOGGER, user_data, GDRIVE_ENABLED, GDRIVE_FOLDER_ID
+from bot import (
+    bot,
+    OWNER_ID,
+    DOWNLOAD_DIR,
+    OUTPUT_DIR,
+    LOGGER,
+    user_data,
+    GDRIVE_ENABLED,
+    GDRIVE_FOLDER_ID,
+    processing_queue,
+)
 from bot.keyboards.menus import (
     main_menu, encode_menu, preset_menu, resolution_menu,
     convert_menu, extract_menu, remove_menu, watermark_menu,
@@ -199,8 +210,19 @@ async def encode_callback(client: Client, query: CallbackQuery):
 
     user_data[user_id]['operation'] = 'encode'
     
-    # Show current encode settings
-    settings = user_data[user_id].get('settings', {})
+    # Load encode settings from DB (if available) as authoritative source
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    db_settings = {}
+    if db:
+        try:
+            db_settings = await db.get_user_settings(user_id)
+        except Exception:
+            db_settings = {}
+
+    # Merge in-memory settings over DB defaults (so runtime tweaks are visible)
+    runtime_settings = user_data[user_id].get('settings', {})
+    settings = {**db_settings, **runtime_settings}
     
     await query.message.edit_text(
         "<b>⚙️ Encode Settings</b>\n\n"
@@ -305,6 +327,81 @@ async def acodec_callback(client: Client, query: CallbackQuery):
         reply_markup=back_and_close_button(user_id, f"encode_{user_id}")
     )
     await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_profile_"))
+async def enc_profile_menu_callback(client: Client, query: CallbackQuery):
+    """Show simple encoding profiles (maps to preset+CRF+codec)."""
+    user_id = int(query.data.split("_")[2])
+
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+
+    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+
+    buttons = [
+        [
+            InlineKeyboardButton("🎥 High Quality", callback_data=f"enc_prof_high_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("⚖️ Balanced", callback_data=f"enc_prof_bal_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("📦 Small Size", callback_data=f"enc_prof_small_{user_id}"),
+        ],
+        [
+            InlineKeyboardButton("Back", callback_data=f"encode_{user_id}"),
+        ],
+    ]
+
+    await query.message.edit_text(
+        "<b>🎛 Encoding Profiles</b>\n\n"
+        "Choose a profile; you can still fine‑tune settings after:",
+        reply_markup=InlineKeyboardMarkup(buttons),
+    )
+    await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^enc_prof_"))
+async def enc_profile_apply_callback(client: Client, query: CallbackQuery):
+    """Apply selected encoding profile to settings and DB."""
+    parts = query.data.split("_")
+    profile_key = parts[2]  # high / bal / small
+    user_id = int(parts[3])
+
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+
+    # Define simple profiles
+    if profile_key == "high":
+        profile = {"preset": "slow", "crf": 20, "video_codec": "libx264"}
+    elif profile_key == "small":
+        profile = {"preset": "slow", "crf": 30, "video_codec": "libx265"}
+    else:  # balanced
+        profile = {"preset": "medium", "crf": 23, "video_codec": "libx264"}
+
+    # Update in-memory settings
+    if user_id not in user_data:
+        user_data[user_id] = {}
+    settings = user_data[user_id].get("settings", {})
+    settings.update(profile)
+    user_data[user_id]["settings"] = settings
+
+    # Persist to DB if available
+    try:
+        from bot.utils.db_handler import get_db
+        db = get_db()
+        if db:
+            for k, v in profile.items():
+                await db.update_setting(user_id, k, v)
+    except Exception:
+        pass
+
+    await query.answer("Profile applied!")
+    # Return to main encode menu to show updated values
+    await encode_callback(client, query)
 
 
 @bot.on_callback_query(filters.regex(r"^enc_fps_"))
@@ -1134,20 +1231,48 @@ async def keepsource_callback(client: Client, query: CallbackQuery):
     await query.answer(f"Keep Source {status}!")
 
 
-# Main processing function
-async def process_video(client: Client, query: CallbackQuery, operation: str, options: dict):
-    """Process video with specified operation"""
+# Main processing function with simple queue support
+async def process_video(
+    client: Client,
+    query: CallbackQuery,
+    operation: str,
+    options: dict,
+    queued: bool = False,
+):
+    """Process video with specified operation (supports per-user queue)"""
     user_id = query.from_user.id
     
     if user_id not in user_data:
         await query.message.edit_text("❌ No video found. Send a video first.")
         return
+
+    # Initialize queue for user
+    if user_id not in processing_queue:
+        processing_queue[user_id] = []
     
-    # Check if user already has an active task
-    if 'progress' in user_data[user_id] and not user_data[user_id]['progress'].cancelled:
-        # Check if it's actually running (start_time check or similar?) 
-        # For now assume existence of progress object implies running task
-        await query.answer("⚠️ You already have an active task! Please wait.", show_alert=True)
+    # If this is a fresh request and user already has an active task, enqueue it
+    if not queued and 'progress' in user_data[user_id] and not user_data[user_id]['progress'].cancelled:
+        from bot import MAX_QUEUE_PER_USER
+        # Enforce simple per-user queue cap
+        if len(processing_queue[user_id]) >= MAX_QUEUE_PER_USER:
+            try:
+                await query.answer("⚠️ Your queue is full. Please wait for current tasks to finish.", show_alert=True)
+            except Exception:
+                pass
+            return
+
+        processing_queue[user_id].append(
+            {
+                "operation": operation,
+                "options": options or {},
+            }
+        )
+        position = len(processing_queue[user_id])
+        # Notify user that task has been queued
+        try:
+            await query.answer(f"Queued at position #{position}. It will start automatically.", show_alert=True)
+        except Exception:
+            pass
         return
 
     # Get original message with the video
@@ -1276,13 +1401,6 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
             
             # Use trim_video
             success, result = await trim_video(input_path, output_path, start_time=start, duration=str(duration))
-            if success:
-                output_path = result
-            else:
-                error = result
-
-        elif operation == 'encode':
-            success, result = await encode_video(input_path, output_path, **options)
             if success:
                 output_path = result
             else:
@@ -1456,22 +1574,32 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
                 error = result
         
         elif operation == 'encode':
-             # Note: encode_video signature is (input, output, ..., progress_callback)
-             # FFmpeg wrapper handles duration internally, so no need to pass it
-             success, result = await encode_video(input_path, output_path, **options, progress_callback=progress.update)
-             if success:
-                 output_path = result
-             else:
-                 error = result
+            # Use encode wrapper with progress reporting
+            success, result = await encode_video(
+                input_path,
+                output_path,
+                **options,
+                progress_callback=progress.update
+            )
+            if success:
+                output_path = result
+            else:
+                error = result
 
         elif operation == 'convert':
-             fmt = options.get('format', 'mp4')
-             # convert_format now accepts duration and progress_callback
-             success, result = await convert_format(input_path, fmt, output_path, progress_callback=progress.update, duration=duration)
-             if success:
-                 output_path = result
-             else:
-                 error = result
+            fmt = options.get('format', 'mp4')
+            # convert_format supports progress & duration
+            success, result = await convert_format(
+                input_path,
+                fmt,
+                output_path,
+                progress_callback=progress.update,
+                duration=duration
+            )
+            if success:
+                output_path = result
+            else:
+                error = result
         
         if not success:
             await status_msg.edit_text(f"❌ Error: {error[:500]}")
@@ -1525,6 +1653,23 @@ async def process_video(client: Client, query: CallbackQuery, operation: str, op
     except Exception as e:
         LOGGER.error(f"Error processing: {e}")
         await status_msg.edit_text(f"❌ Error: {str(e)[:500]}")
+    finally:
+        # If there are queued tasks for this user, start the next one
+        if processing_queue.get(user_id):
+            next_task = processing_queue[user_id].pop(0)
+            
+            # Build a minimal fake query object reusing the same message & user
+            fake_query = SimpleNamespace(
+                message=status_msg,
+                from_user=query.from_user,
+            )
+            await process_video(
+                client,
+                fake_query,
+                next_task["operation"],
+                next_task.get("options", {}),
+                queued=True,
+            )
 
 
 # Google Drive upload callbacks
@@ -1728,6 +1873,31 @@ async def cancel_upload_callback(client: Client, query: CallbackQuery):
     
     await query.message.delete()
     await query.answer("Cancelled and deleted!")
+
+
+@bot.on_callback_query(filters.regex(r"^finalup_default_"))
+async def upload_default_callback(client: Client, query: CallbackQuery):
+    """Upload using user's default destination (Telegram or Google Drive)."""
+    user_id = int(query.data.split("_")[2])
+
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    dest = "telegram"
+    if db:
+        try:
+            dest = await db.get_default_destination(user_id)
+        except Exception:
+            dest = "telegram"
+
+    # Delegate to the appropriate existing handler
+    if dest == "gdrive":
+        await upload_gdrive_callback(client, query)
+    else:
+        await upload_telegram_callback(client, query)
 
 @bot.on_callback_query(filters.regex(r"^open_settings$"))
 @bot.on_callback_query(filters.regex(r"^back_to_main_settings$"))
@@ -2025,6 +2195,28 @@ async def reset_settings_confirm_callback(client: Client, query: CallbackQuery):
         reply_markup=await open_settings(user_id)
     )
     await query.answer()
+
+@bot.on_callback_query(filters.regex(r"^toggle_default_destination$"))
+async def toggle_default_destination_callback(client: Client, query: CallbackQuery):
+    """Toggle default upload destination between Telegram and Google Drive."""
+    from bot.utils.db_handler import get_db
+    from bot.keyboards.settings_menu import advanced_settings_menu
+
+    db = get_db()
+    user_id = query.from_user.id
+
+    if not db:
+        await query.answer("Database not connected.", show_alert=True)
+        return
+
+    current = await db.get_default_destination(user_id)
+    new_val = "gdrive" if current == "telegram" else "telegram"
+    await db.set_default_destination(user_id, new_val)
+
+    await query.message.edit_reply_markup(
+        reply_markup=await advanced_settings_menu(user_id)
+    )
+    await query.answer(f"Default upload set to {'Google Drive' if new_val == 'gdrive' else 'Telegram'}.")
 
 @bot.on_callback_query(filters.regex(r"^set_audio_codec_menu$"))
 async def set_audio_codec_menu_callback(client: Client, query: CallbackQuery):

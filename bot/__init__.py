@@ -51,6 +51,9 @@ GDRIVE_ENABLED = environ.get('GDRIVE_ENABLED', 'False').lower() == 'true'
 GDRIVE_CREDENTIALS = environ.get('GDRIVE_CREDENTIALS', 'credentials.json')
 GDRIVE_FOLDER_ID = environ.get('GDRIVE_FOLDER_ID', '')
 
+# External download helpers
+ENABLE_YTDLP = environ.get('ENABLE_YTDLP', 'False').lower() == 'true'
+
 # FFmpeg Defaults
 DEFAULT_VIDEO_CODEC = environ.get('DEFAULT_VIDEO_CODEC', 'libx264')
 DEFAULT_AUDIO_CODEC = environ.get('DEFAULT_AUDIO_CODEC', 'aac')
@@ -58,15 +61,26 @@ DEFAULT_CRF = int(environ.get('DEFAULT_CRF', 23))
 DEFAULT_PRESET = environ.get('DEFAULT_PRESET', 'medium')
 DEFAULT_AUDIO_BITRATE = environ.get('DEFAULT_AUDIO_BITRATE', '192k')
 
-# Authorized Users
+# Authorized Users (private chats)
 AUTHORIZED_USERS = environ.get('AUTHORIZED_USERS', '')
 if AUTHORIZED_USERS:
-    AUTHORIZED_USERS = set(int(x) for x in AUTHORIZED_USERS.split(','))
+    AUTHORIZED_USERS = set(int(x) for x in AUTHORIZED_USERS.split(',') if x.strip())
 else:
     AUTHORIZED_USERS = set()
 
+# Authorized Groups (group/supergroup chats)
+# Comma separated list of chat IDs, e.g. "-1001234567890,-100987654321"
+AUTHORIZED_GROUPS = environ.get('AUTHORIZED_GROUPS', '')
+if AUTHORIZED_GROUPS:
+    AUTHORIZED_GROUPS = set(int(x) for x in AUTHORIZED_GROUPS.split(',') if x.strip())
+else:
+    AUTHORIZED_GROUPS = set()
+
 # Log Channel
 LOG_CHANNEL = int(environ.get('LOG_CHANNEL', 0))
+
+# Queue / rate limiting
+MAX_QUEUE_PER_USER = int(environ.get('MAX_QUEUE_PER_USER', 3))
 
 # Create directories
 for directory in [DOWNLOAD_DIR, OUTPUT_DIR]:
@@ -74,6 +88,7 @@ for directory in [DOWNLOAD_DIR, OUTPUT_DIR]:
 
 # User data storage (in-memory, backed by MongoDB)
 user_data = {}
+# Per-user processing queue (list of pending operations)
 processing_queue = {}
 
 # Bot client

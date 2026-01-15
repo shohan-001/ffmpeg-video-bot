@@ -20,3 +20,4 @@ hachoir
 hachoir
 patool
 speedtest-cli
+yt-dlp

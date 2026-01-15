@@ -65,6 +65,9 @@ def encode_menu(user_id: int) -> InlineKeyboardMarkup:
             InlineKeyboardButton("FPS", callback_data=f"enc_fps_{user_id}"),
         ],
         [
+            InlineKeyboardButton("Profiles", callback_data=f"enc_profile_{user_id}"),
+        ],
+        [
             InlineKeyboardButton("Start Encoding", callback_data=f"enc_start_{user_id}"),
         ],
         [
@@ -417,6 +420,11 @@ def after_process_menu(user_id: int, file_size_mb: float, gdrive_enabled: bool =
         buttons.append([
             InlineKeyboardButton("Upload to Google Drive", callback_data=f"finalup_gdrive_{user_id}"),
         ])
+    
+    # Default upload destination (from settings)
+    buttons.append([
+        InlineKeyboardButton("Upload (Default)", callback_data=f"finalup_default_{user_id}"),
+    ])
     
     buttons.append([
         InlineKeyboardButton("Download Link", callback_data=f"finalup_link_{user_id}"),

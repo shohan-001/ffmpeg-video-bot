@@ -6,7 +6,7 @@ from pyrogram import Client, filters
 from pyrogram.types import Message
 from pyrogram.enums import ChatType
 
-from bot import bot, user_data, LOGGER
+from bot import bot, user_data, LOGGER, AUTHORIZED_GROUPS
 from bot.keyboards.menus import main_menu, close_button, confirm_menu, encode_menu, watermark_menu, after_process_menu
 from bot.handlers.callbacks import process_video
 
@@ -18,6 +18,12 @@ async def handle_text_input(client: Client, message: Message):
         if not user:
             return
         user_id = user.id
+
+        # If message comes from a group/supergroup, enforce authorized groups (if configured)
+        if message.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+            if AUTHORIZED_GROUPS and message.chat.id not in AUTHORIZED_GROUPS:
+                # Silently ignore in unauthorized groups to avoid spam
+                return
         
         # Debug log
         # LOGGER.info(f"Received text from {user_id}: {message.text}")
@@ -26,8 +32,9 @@ async def handle_text_input(client: Client, message: Message):
             # If user sends text but has no session
             # Only reply in private to avoid spamming groups
             if message.chat.type == ChatType.PRIVATE:
-                 # await message.reply_text("DEBUG: No active session. Please use buttons.")
-                 pass
+                # No active session; we keep silent or could show a short hint
+                # await message.reply_text("Send a video first to start processing.")
+                pass
             return
             
         waiting_for = user_data[user_id].get('waiting_for')
@@ -146,17 +153,26 @@ async def handle_text_input(client: Client, message: Message):
             await process_video(client, MockQuery(message, user), 'rename', {'new_name': new_name})
 
         elif waiting_for.startswith('enc_'):
-            # Encoding settings
+            # Encoding settings (persist both in-memory and to DB)
             setting = waiting_for.replace('enc_', '')
-            
+            value = text.strip()
+
             if 'settings' not in user_data[user_id]:
                 user_data[user_id]['settings'] = {}
-                
-            user_data[user_id]['settings'][setting] = text.strip()
+            user_data[user_id]['settings'][setting] = value
             user_data[user_id]['waiting_for'] = None
-            
+
+            # Persist to MongoDB if available
+            try:
+                from bot.utils.db_handler import get_db
+                db = get_db()
+                if db:
+                    await db.update_setting(user_id, setting, value)
+            except Exception:
+                pass
+
             await message.reply_text(
-                f"✅ <b>{setting.upper()}</b> set to: <code>{text}</code>",
+                f"✅ <b>{setting.upper()}</b> set to: <code>{value}</code>",
                 reply_markup=encode_menu(user_id)
             )
 

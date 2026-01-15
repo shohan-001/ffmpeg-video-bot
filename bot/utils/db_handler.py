@@ -111,6 +111,8 @@ class Database:
             # Processing state
             "current_operation": None,
             "processing_file": None,
+            # Upload preferences
+            "default_destination": "telegram",  # or 'gdrive'
         }
 
 
@@ -157,6 +159,9 @@ class Database:
     async def get_samplerate(self, user_id): return (await self.get_user_settings(user_id)).get('sample_rate')
     async def get_bitrate(self, user_id): return (await self.get_user_settings(user_id)).get('audio_bitrate')
     async def get_channels(self, user_id): return (await self.get_user_settings(user_id)).get('channels')
+
+    async def get_default_destination(self, user_id): return (await self.get_user_settings(user_id)).get('default_destination', 'telegram')
+    async def set_default_destination(self, user_id, value): await self.update_setting(user_id, 'default_destination', value)
 
     # Thumbnail
     async def get_thumbnail(self, user_id):

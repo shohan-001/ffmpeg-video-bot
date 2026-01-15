@@ -218,104 +218,30 @@ async def handle_photo(client: Client, message: Message):
 
 
 @bot.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings", "vset", "cancel", "stats", "log", "broadcast", "zip", "unzip", "thumb"]))
-async def handle_text_input(client: Client, message: Message):
-    # ... (rest of handle_text_input is unchanged, but we needed to modify handle_photo first)
-    # Actually, I am replacing the file content from handle_photo onwards, so I need to include handle_text_input if I am replacing a chunk that covers both.
-    # But I can just target handle_photo block if I am careful.
-    # Let's just implement handle_photo correctly.
-    pass 
-    # I will rely on the fact that I am replacing handle_photo and can leave handle_text_input alone if I target correctly.
-    # But wait, looking at the previous file view, handle_photo ends around line 199.
-    # I'll just replace the handle_photo function.
-
-async def upload_file(client: Client, chat_id: int, file_path: str | list, status_msg: Message, caption: str = None, user_id: int = None):
-    """Upload file with progress"""
-    
-    # Handle list of files (Media Group)
-    if isinstance(file_path, list):
-        from pyrogram.types import InputMediaPhoto
-        media = []
-        for f in file_path:
-            # Assume photos for now (screenshots)
-            media.append(InputMediaPhoto(f))
-        
-        await status_msg.edit_text("📤 Uploading album...")
-        try:
-            await client.send_media_group(chat_id, media)
-        except Exception as e:
-            await status_msg.edit_text(f"❌ Upload failed: {e}")
-            raise e
+async def legacy_text_router(client: Client, message: Message):
+    """
+    Backwards-compatible text router for this module.
+    Currently delegates URL handling to handle_url_logic; all other
+    stateful text input (encode, trim, etc.) is handled in message_handler.
+    """
+    user = message.from_user
+    if not is_authorized(user.id):
         return
 
-    # Single File
-    file_name = os.path.basename(file_path) if isinstance(file_path, str) else "Album"
-    progress = Progress(status_msg, "📤 Uploading", user_id=user_id, filename=file_name)
-    
-    # Store progress for cancellation
-    if user_id and user_id in user_data:
-        user_data[user_id]['progress'] = progress
-    
-    # Prepare Thumbnail
-    thumb_path = None
-    if user_id:
-        from bot.utils.db_handler import get_db
-        db = get_db()
-        thumb_id = await db.get_thumbnail(user_id)
-        
-        if thumb_id:
-            try:
-                # Download thumb to temp
-                import time
-                temp_thumb = os.path.join(DOWNLOAD_DIR, f"thumb_{user_id}_{int(time.time())}.jpg")
-                await client.download_media(thumb_id, file_name=temp_thumb)
-                if os.path.exists(temp_thumb):
-                    thumb_path = temp_thumb
-            except Exception as e:
-                LOGGER.error(f"Failed to download custom thumbnail: {e}")
+    text = (message.text or "").strip()
+    if not text:
+        return
 
-    # Start Upload
-    try:
-        video_exts = ['.mp4', '.mkv', '.avi', '.mov', '.webm']
-        ext = os.path.splitext(file_name)[1].lower()
-        
-        sent_msg = None
-
-        if ext in video_exts:
-            sent_msg = await client.send_video(
-                chat_id,
-                file_path,
-                caption=caption or f"✅ <code>{file_name}</code>",
-                progress=progress.progress_callback,
-                thumb=thumb_path
-            )
-        else:
-            sent_msg = await client.send_document(
-                chat_id,
-                file_path,
-                caption=caption or f"✅ <code>{file_name}</code>",
-                progress=progress.progress_callback,
-                thumb=thumb_path
-            )
-            
-        # Log Channel Forwarding
-        from bot import LOG_CHANNEL
-        if sent_msg and LOG_CHANNEL:
-            try:
-                await sent_msg.copy(LOG_CHANNEL, caption=f"Processing Request from {user_id}\n\n" + (sent_msg.caption or ""))
-            except Exception as e:
-                LOGGER.error(f"Failed to forward to log channel: {e}")
-                
-    except Exception as e:
-        if progress.cancelled:
-            raise asyncio.CancelledError("Cancelled by user")
-        raise e
-    finally:
-        # Cleanup thumb
-        if thumb_path and os.path.exists(thumb_path):
-            try:
-                os.remove(thumb_path)
-            except:
-                pass
+    # If this looks like a URL anywhere in the text, pass to URL logic
+    if "http://" in text or "https://" in text:
+        # Simple extraction: take first http(s) substring
+        import re
+        match = re.search(r'(https?://\S+)', text)
+        url = match.group(1) if match else text
+        await handle_url_logic(client, message, url)
+        return
+    # Non‑URL text is handled by bot.handlers.message_handler.handle_text_input
+    return
 
 @bot.on_message(filters.private & filters.text & ~filters.command(["start", "help", "settings", "vset", "cancel", "stats", "log", "broadcast", "zip", "unzip"]))
 async def handle_text_input(client: Client, message: Message):
@@ -397,17 +323,29 @@ async def handle_url_logic(client, message, text):
     user = message.from_user
     status_msg = await message.reply_text("🔎 Processing URL...", quote=True)
     
+    # Normalize and extract first URL from arbitrary text
+    import re
+    match = re.search(r'(https?://\S+)', text)
+    url = match.group(1) if match else text.strip()
+    
     # 1. Try Direct Link Generator
     from bot.utils.direct_links import direct_link_generator
-    direct_link = direct_link_generator(text)
+    direct_link = direct_link_generator(url)
     
     if direct_link:
         download_url = direct_link
-        await status_msg.edit_text(f"✅ Direct Link Detected!\n`{download_url}`\n\nStarting download...")
+        await status_msg.edit_text(
+            "✅ <b>Direct link detected!</b>\n"
+            f"<code>{download_url}</code>\n\n"
+            "Starting download..."
+        )
     else:
-        # Fallback to authentic URL (maybe direct or yt-dlp supported)
-        download_url = text
-        await status_msg.edit_text("ℹ️ Standard URL detected. Attempting to download...")
+        # Fallback to the original URL
+        download_url = url
+        await status_msg.edit_text(
+            "ℹ️ <b>Standard URL detected.</b>\n"
+            "Attempting to download directly..."
+        )
 
     # Download Logic
     try:
@@ -419,9 +357,38 @@ async def handle_url_logic(client, message, text):
         
         file_path = await download_http_file(download_url, user_dir, status_msg, user_id=user.id)
         
+        # If HTTP download failed and yt-dlp is enabled, try yt-dlp as a fallback
         if not file_path:
-             await status_msg.edit_text("❌ Failed to download file from URL.")
-             return
+            from bot import ENABLE_YTDLP
+            if ENABLE_YTDLP:
+                await status_msg.edit_text(
+                    "⚠️ Direct download failed.\n"
+                    "Trying <code>yt-dlp</code> as a fallback..."
+                )
+                import asyncio
+                import glob
+                # Use yt-dlp to download best video to user_dir
+                out_tpl = os.path.join(user_dir, "%(title)s.%(ext)s")
+                proc = await asyncio.create_subprocess_exec(
+                    "yt-dlp",
+                    "-o",
+                    out_tpl,
+                    url,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await proc.wait()
+                if proc.returncode == 0:
+                    # Pick the newest file in user_dir as the downloaded file
+                    candidates = glob.glob(os.path.join(user_dir, "*"))
+                    if candidates:
+                        file_path = max(candidates, key=os.path.getmtime)
+                if not file_path:
+                    await status_msg.edit_text("❌ Failed to download file from URL.")
+                    return
+            else:
+                await status_msg.edit_text("❌ Failed to download file from URL.")
+                return
         
         # Prepare for processing
         file_name = os.path.basename(file_path)

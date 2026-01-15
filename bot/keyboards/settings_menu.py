@@ -113,7 +113,15 @@ async def watermark_settings_menu(user_id: int):
 
 async def advanced_settings_menu(user_id: int):
     """Advanced settings menu"""
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    dest = "Telegram"
+    if db:
+        pref = await db.get_default_destination(user_id)
+        dest = "Google Drive" if pref == "gdrive" else "Telegram"
+
     buttons = [
+        [InlineKeyboardButton(f"Default Upload: {dest}", callback_data="toggle_default_destination")],
         [InlineKeyboardButton("Reset All Settings", callback_data="reset_settings_confirm")],
         [InlineKeyboardButton("🔙 Back", callback_data="back_to_main_settings")]
     ]
