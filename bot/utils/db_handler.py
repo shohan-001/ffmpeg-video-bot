@@ -220,8 +220,40 @@ class Database:
         await self._settings.delete_one({"_id": "gdrive_credentials"})
 
     async def has_gdrive_credentials(self) -> bool:
-        """Check if GDrive credentials exist."""
+        """Check if GDrive credentials exist (Service Account)."""
         doc = await self._settings.find_one({"_id": "gdrive_credentials"})
+        return doc is not None
+
+    # OAuth 2.0 Credentials
+    async def set_gdrive_client_secrets(self, json_data: str):
+        """Store OAuth client secrets (credentials.json for app)."""
+        await self._settings.update_one(
+            {"_id": "gdrive_client_secrets"},
+            {"$set": {"data": json_data}},
+            upsert=True
+        )
+
+    async def get_gdrive_client_secrets(self) -> str:
+        """Get OAuth client secrets."""
+        doc = await self._settings.find_one({"_id": "gdrive_client_secrets"})
+        return doc.get("data") if doc else None
+
+    async def set_gdrive_oauth_token(self, json_data: str):
+        """Store OAuth user token (refresh token)."""
+        await self._settings.update_one(
+            {"_id": "gdrive_oauth_token"},
+            {"$set": {"data": json_data}},
+            upsert=True
+        )
+
+    async def get_gdrive_oauth_token(self) -> str:
+        """Get OAuth user token."""
+        doc = await self._settings.find_one({"_id": "gdrive_oauth_token"})
+        return doc.get("data") if doc else None
+
+    async def has_gdrive_oauth_token(self) -> bool:
+        """Check if OAuth token exists."""
+        doc = await self._settings.find_one({"_id": "gdrive_oauth_token"})
         return doc is not None
 
     async def get_gdrive_folder_id(self) -> str:

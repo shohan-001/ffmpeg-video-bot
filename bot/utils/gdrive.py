@@ -8,6 +8,8 @@ import asyncio
 from typing import Callable, Tuple, Optional
 
 from google.oauth2 import service_account
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 from googleapiclient.errors import HttpError
@@ -32,41 +34,75 @@ class GoogleDrive:
         self.service = None
         self._initialized = False
         
+    async def generate_oauth_url(self, client_secrets: dict) -> str:
+        """Generate OAuth authorization URL."""
+        flow = Flow.from_client_config(
+            client_secrets,
+            scopes=SCOPES,
+            redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+        )
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        return auth_url
+
+    async def exchange_oauth_code(self, client_secrets: dict, code: str) -> str:
+        """Exchange auth code for credentials token."""
+        def _exchange():
+            flow = Flow.from_client_config(
+                client_secrets,
+                scopes=SCOPES,
+                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+            )
+            flow.fetch_token(code=code)
+            return flow.credentials.to_json()
+        
+        return await asyncio.to_thread(_exchange)
+
     async def initialize(self) -> bool:
-        """Initialize the Drive service"""
+        """Initialize the Drive service (OAuth > MongoDB SA > File SA)"""
+        if self._initialized and self.service:
+            return True
+            
         try:
             credentials = None
+            from bot.utils.db_handler import get_db
+            import json
+            db = get_db()
             
-            # First, try file-based credentials
-            if os.path.exists(self.credentials_file):
+            # 1. Try OAuth User Token (MongoDB)
+            if db:
+                try:
+                    token_json = await db.get_gdrive_oauth_token()
+                    if token_json:
+                        info = json.loads(token_json)
+                        credentials = Credentials.from_authorized_user_info(info, SCOPES)
+                        LOGGER.info("Using OAuth User Credentials from MongoDB")
+                except Exception as e:
+                    LOGGER.warning(f"OAuth token load failed: {e}")
+            
+            # 2. Try Service Account (MongoDB)
+            if not credentials and db:
+                try:
+                    creds_data = await db.get_gdrive_credentials()
+                    if creds_data:
+                        creds_json = json.loads(creds_data)
+                        credentials = service_account.Credentials.from_service_account_info(
+                            creds_json,
+                            scopes=SCOPES
+                        )
+                        LOGGER.info("Using Service Account from MongoDB")
+                except Exception as e:
+                    LOGGER.warning(f"Service Account DB load failed: {e}")
+            
+            # 3. Try Service Account (Local File)
+            if not credentials and os.path.exists(self.credentials_file):
                 try:
                     credentials = service_account.Credentials.from_service_account_file(
                         self.credentials_file,
                         scopes=SCOPES
                     )
-                    LOGGER.info("Using credentials from file")
+                    LOGGER.info("Using Service Account from file")
                 except Exception as e:
-                    LOGGER.warning(f"Local credentials file failed: {e}. Trying database...")
-            
-            if not credentials:
-                # Try to load from MongoDB
-                try:
-                    from bot.utils.db_handler import get_db
-                    import json
-                    
-                    db = get_db()
-                    if db:
-                        creds_data = await db.get_gdrive_credentials()
-                        
-                        if creds_data:
-                            creds_json = json.loads(creds_data)
-                            credentials = service_account.Credentials.from_service_account_info(
-                                creds_json,
-                                scopes=SCOPES
-                            )
-                            LOGGER.info("Using credentials from MongoDB")
-                except Exception as e:
-                    LOGGER.warning(f"Could not load credentials from MongoDB: {e}")
+                    LOGGER.warning(f"Local credentials file failed: {e}")
             
             if not credentials:
                 LOGGER.warning(f"No GDrive credentials found")

@@ -996,26 +996,28 @@ async def handle_document_upload(client: Client, message: Message):
             is_service_account = creds_json.get('type') == 'service_account'
             has_required_fields = 'client_email' in creds_json and 'private_key' in creds_json
             
+            # OAuth Identification
+            is_oauth = 'web' in creds_json or 'installed' in creds_json
+            
+            db = get_db()
+
+            if is_oauth:
+                await db.set_gdrive_client_secrets(creds_data)
+                await status_msg.edit_text(
+                    "✅ <b>OAuth Client Secrets Uploaded!</b>\n\n"
+                    "Now authorize the bot:\n"
+                    "1. Run <code>/gdrive login</code>\n"
+                    "2. Click the link and get the code\n"
+                    "3. Run <code>/gdrive auth &lt;code&gt;</code>"
+                )
+                os.remove(file_path)
+                return
+
             if not (is_service_account or has_required_fields):
-                # Check if it's an OAuth file to give better error
-                if 'web' in creds_json or 'installed' in creds_json:
-                    await status_msg.edit_text(
-                        "❌ <b>Incorrect File Type</b>\n\n"
-                        "You uploaded an <b>OAuth Client ID</b> (Desktop App) file.\n"
-                        "This bot needs a <b>Service Account</b> to run autonomously.\n\n"
-                        "<b>How to fix:</b>\n"
-                        "1. Go to <a href='https://console.cloud.google.com/iam-admin/serviceaccounts'>Service Accounts Dashboard</a>\n"
-                        "2. Click <b>+ CREATE SERVICE ACCOUNT</b>\n"
-                        "3. Click on the created account email\n"
-                        "4. Go to <b>KEYS</b> tab → <b>ADD KEY</b> → <b>JSON</b>\n"
-                        "5. Upload THAT file here."
-                    )
-                else:
-                    await status_msg.edit_text(
-                        "❌ <b>Invalid JSON</b>\n\n"
-                        "This does not look like a Google Service Account key.\n"
-                        "It must contain <code>type: service_account</code> or <code>client_email</code>/<code>private_key</code>."
-                    )
+                await status_msg.edit_text(
+                    "❌ <b>Invalid JSON</b>\n\n"
+                    "This looks like neither a Service Account key nor an OAuth Client Secret."
+                )
                 os.remove(file_path)
                 return
             
@@ -1098,6 +1100,55 @@ async def gdrive_command(client: Client, message: Message):
         folder_id = args[2].strip()
         await db.set_gdrive_folder_id(folder_id)
         await message.reply_text(f"✅ <b>Google Drive Folder ID set!</b>\n\nID: <code>{folder_id}</code>")
+        return
+
+    elif action == "login":
+        secrets_json = await db.get_gdrive_client_secrets()
+        if not secrets_json:
+            await message.reply_text(
+                "❌ <b>No OAuth Credentials found!</b>\n\n"
+                "Please upload your <code>client_secrets.json</code> (Desktop App) using <code>/gdrive set</code>."
+            )
+            return
+            
+        try:
+            from bot.utils.gdrive import get_gdrive
+            import json
+            secrets = json.loads(secrets_json)
+            auth_url = await get_gdrive().generate_oauth_url(secrets)
+            await message.reply_text(
+                f"<b>🔐 Google Drive Login</b>\n\n"
+                f"1. <a href='{auth_url}'>Click here to Authorize</a>\n"
+                f"2. Copy the authorization code\n"
+                f"3. Send: <code>/gdrive auth &lt;code&gt;</code>"
+            )
+        except Exception as e:
+            await message.reply_text(f"❌ Error generating login URL: {e}")
+        return
+
+    elif action == "auth":
+        if len(args) < 3:
+            await message.reply_text("❌ Usage: <code>/gdrive auth &lt;code&gt;</code>")
+            return
+            
+        code = args[2].strip()
+        secrets_json = await db.get_gdrive_client_secrets()
+        if not secrets_json:
+             await message.reply_text("❌ OAuth Credentials missing.")
+             return
+
+        try:
+            from bot.utils.gdrive import get_gdrive
+            import json
+            secrets = json.loads(secrets_json)
+            token_json = await get_gdrive().exchange_oauth_code(secrets, code)
+            
+            await db.set_gdrive_oauth_token(token_json)
+            await get_gdrive().initialize()
+            
+            await message.reply_text("✅ <b>Login Successful!</b>\n\nThe bot is now authorized to upload to your account.")
+        except Exception as e:
+            await message.reply_text(f"❌ Authorization failed: {e}")
         return
     
     if action == "set":
