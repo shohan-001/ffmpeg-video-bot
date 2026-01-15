@@ -991,8 +991,26 @@ async def handle_document_upload(client: Client, message: Message):
             # Basic validation
             import json
             creds_json = json.loads(creds_data)
-            if 'type' not in creds_json or creds_json.get('type') != 'service_account':
-                await status_msg.edit_text("❌ Invalid credentials. Must be a Google Service Account JSON.")
+            
+            # Check identifying fields
+            is_service_account = creds_json.get('type') == 'service_account'
+            has_required_fields = 'client_email' in creds_json and 'private_key' in creds_json
+            
+            if not (is_service_account or has_required_fields):
+                # Check if it's an OAuth file to give better error
+                if 'web' in creds_json or 'installed' in creds_json:
+                    await status_msg.edit_text(
+                        "❌ <b>Incorrect File Type</b>\n\n"
+                        "You uploaded an <b>OAuth Client ID</b> file.\n"
+                        "Please create a <b>Service Account</b> instead:\n"
+                        "IAM & Admin > Service Accounts > Create > Keys > JSON"
+                    )
+                else:
+                    await status_msg.edit_text(
+                        "❌ <b>Invalid JSON</b>\n\n"
+                        "This does not look like a Google Service Account key.\n"
+                        "It must contain <code>type: service_account</code> or <code>client_email</code>/<code>private_key</code>."
+                    )
                 os.remove(file_path)
                 return
             
