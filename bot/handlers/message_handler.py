@@ -50,7 +50,7 @@ async def handle_text_input(client: Client, message: Message):
                 return
         
         # Debug log
-        # LOGGER.info(f"Received text from {user_id}: {message.text}")
+        LOGGER.info(f"Received text from {user_id}: {message.text}")
         
         if user_id not in user_data:
             # If user sends text but has no session

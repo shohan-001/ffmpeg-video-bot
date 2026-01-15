@@ -49,26 +49,38 @@ def main_menu(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
-def encode_menu(user_id: int) -> InlineKeyboardMarkup:
+
+def encode_menu(user_id: int, settings: dict = None) -> InlineKeyboardMarkup:
     """Encoding options menu"""
+    if settings is None:
+        settings = {}
+
+    # Get current values for labels
+    crf = settings.get('crf', 'Default')
+    preset = settings.get('preset', 'Default')
+    vcodec = settings.get('vcodec', 'Default')
+    acodec = settings.get('acodec', 'Default')
+    res = settings.get('resolution', 'Original')
+    fps = settings.get('fps', 'Original')
+
     buttons = [
         [
-            InlineKeyboardButton("Preset", callback_data=f"enc_preset_{user_id}"),
-            InlineKeyboardButton("CRF", callback_data=f"enc_crf_{user_id}"),
+            InlineKeyboardButton(f"Preset: {preset}", callback_data=f"enc_preset_{user_id}"),
+            InlineKeyboardButton(f"CRF: {crf}", callback_data=f"enc_crf_{user_id}"),
         ],
         [
-            InlineKeyboardButton("Video Codec", callback_data=f"enc_vcodec_{user_id}"),
-            InlineKeyboardButton("Audio Codec", callback_data=f"enc_acodec_{user_id}"),
+            InlineKeyboardButton(f"VCodec: {vcodec}", callback_data=f"enc_vcodec_{user_id}"),
+            InlineKeyboardButton(f"ACodec: {acodec}", callback_data=f"enc_acodec_{user_id}"),
         ],
         [
-            InlineKeyboardButton("Resolution", callback_data=f"enc_res_{user_id}"),
-            InlineKeyboardButton("FPS", callback_data=f"enc_fps_{user_id}"),
+            InlineKeyboardButton(f"Res: {res}", callback_data=f"enc_res_{user_id}"),
+            InlineKeyboardButton(f"FPS: {fps}", callback_data=f"enc_fps_{user_id}"),
         ],
         [
             InlineKeyboardButton("Profiles", callback_data=f"enc_profile_{user_id}"),
         ],
         [
-            InlineKeyboardButton("Start Encoding", callback_data=f"enc_start_{user_id}"),
+            InlineKeyboardButton("🚀 Start Encoding", callback_data=f"enc_start_{user_id}"),
         ],
         [
             InlineKeyboardButton("Back", callback_data=f"main_{user_id}"),
@@ -78,13 +90,17 @@ def encode_menu(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
-def preset_menu(user_id: int) -> InlineKeyboardMarkup:
+def preset_menu(user_id: int, current: str = None) -> InlineKeyboardMarkup:
     """FFmpeg preset selection"""
     presets = ['ultrafast', 'superfast', 'veryfast', 'faster', 'fast', 'medium', 'slow', 'slower', 'veryslow']
     buttons = []
     row = []
     for preset in presets:
-        row.append(InlineKeyboardButton(preset, callback_data=f"preset_{preset}_{user_id}"))
+        label = preset
+        if current == preset:
+            label = f"✅ {preset}"
+        
+        row.append(InlineKeyboardButton(label, callback_data=f"preset_{preset}_{user_id}"))
         if len(row) == 3:
             buttons.append(row)
             row = []
@@ -94,7 +110,7 @@ def preset_menu(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(buttons)
 
 
-def resolution_menu(user_id: int) -> InlineKeyboardMarkup:
+def resolution_menu(user_id: int, current: str = None) -> InlineKeyboardMarkup:
     """Resolution selection"""
     resolutions = [
         ('480p', '854x480'),
@@ -107,7 +123,12 @@ def resolution_menu(user_id: int) -> InlineKeyboardMarkup:
     buttons = []
     row = []
     for name, res in resolutions:
-        row.append(InlineKeyboardButton(name, callback_data=f"res_{res}_{user_id}"))
+        label = name
+        # Check if current matches name (480p) or resolution (854x480)
+        if current and (current == name or current == res):
+            label = f"✅ {name}"
+            
+        row.append(InlineKeyboardButton(label, callback_data=f"res_{res}_{user_id}"))
         if len(row) == 3:
             buttons.append(row)
             row = []

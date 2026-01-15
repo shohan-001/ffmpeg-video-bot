@@ -287,7 +287,7 @@ async def encode_callback(client: Client, query: CallbackQuery):
         f"<b>Audio Codec:</b> {settings.get('audio_codec', 'aac')}\n"
         f"<b>Resolution:</b> {settings.get('resolution', 'Original')}\n\n"
         "Select an option to change:",
-        reply_markup=encode_menu(user_id)
+        reply_markup=encode_menu(user_id, settings)
     )
     await query.answer()
 
@@ -300,12 +300,24 @@ async def preset_callback(client: Client, query: CallbackQuery):
     if query.from_user.id != user_id:
         await query.answer("Not your button!", show_alert=True)
         return
+    # Get current preset
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    current = "medium"
     
+    if 'settings' in user_data.get(user_id, {}):
+        current = user_data[user_id]['settings'].get('preset', 'medium')
+    elif db:
+        try:
+            s = await db.get_user_settings(user_id)
+            current = s.get('preset', 'medium')
+        except: pass
+
     await query.message.edit_text(
-        "<b>📊 Select Encoding Preset</b>\n\n"
+        f"<b>📊 Select Encoding Preset</b>\nCurrent: {current}\n\n"
         "Faster = Lower quality\n"
         "Slower = Higher quality",
-        reply_markup=preset_menu(user_id)
+        reply_markup=preset_menu(user_id, current)
     )
     await query.answer()
 
@@ -626,11 +638,53 @@ async def resolution_callback(client: Client, query: CallbackQuery):
         await query.answer("Not your button!", show_alert=True)
         return
     
+    # Get current resolution
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    current = "Original"
+    
+    # Check runtime first, then DB
+    if 'settings' in user_data.get(user_id, {}):
+        current = user_data[user_id]['settings'].get('resolution', 'Original')
+    elif db:
+        try:
+            s = await db.get_user_settings(user_id)
+            current = s.get('resolution', 'Original')
+        except: pass
+
     await query.message.edit_text(
-        "<b>📐 Select Resolution</b>",
-        reply_markup=resolution_menu(user_id)
+        f"<b>📐 Select Resolution</b>\nCurrent: {current}",
+        reply_markup=resolution_menu(user_id, current)
     )
     await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^res_"))
+async def set_resolution_callback(client: Client, query: CallbackQuery):
+    """Set resolution"""
+    parts = query.data.split("_")
+    res = parts[1]
+    user_id = int(parts[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+        
+    if 'settings' not in user_data[user_id]:
+        user_data[user_id]['settings'] = {}
+    
+    user_data[user_id]['settings']['resolution'] = res
+    
+    # Persist to DB
+    from bot.utils.db_handler import get_db
+    db = get_db()
+    if db:
+        await db.update_setting(user_id, 'resolution', res)
+        
+    await query.answer(f"Resolution set to: {res}")
+    
+    # Return to encode menu
+    await encode_callback(client, query)
 
 
 @bot.on_callback_query(filters.regex(r"^convert_"))
