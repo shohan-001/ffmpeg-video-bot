@@ -1078,15 +1078,15 @@ async def gdrive_command(client: Client, message: Message):
             f"<b>Credentials:</b> {status}\n"
             f"<b>Folder ID:</b> {folder}\n\n"
             f"<b>Commands:</b>\n"
-            f"• <code>/gdrive set</code> - Upload credentials.json\n"
+            f"• <code>/gdrive set</code> - Upload credentials (OAuth/Service Account)\n"
+            f"• <code>/gdrive login</code> - Login via OAuth (Recommended)\n"
             f"• <code>/gdrive folder &lt;ID&gt;</code> - Set Folder ID\n"
             f"• <code>/gdrive clear</code> - Delete credentials\n\n"
-            f"<b>Setup:</b>\n"
-            f"1. Create a Google Cloud project\n"
-            f"2. Enable Google Drive API\n"
-            f"3. Create a Service Account\n"
-            f"4. Download credentials.json\n"
-            f"5. Upload with <code>/gdrive set</code>"
+            f"<b>Setup (OAuth - Recommended):</b>\n"
+            f"1. Create Google Cloud Project\n"
+            f"2. Create OAuth Client ID (Desktop App)\n"
+            f"3. Upload JSON with <code>/gdrive set</code>\n"
+            f"4. Run <code>/gdrive login</code>"
         )
         return
     
@@ -1156,15 +1156,16 @@ async def gdrive_command(client: Client, message: Message):
     if action == "set":
         user_data[message.from_user.id] = user_data.get(message.from_user.id, {})
         user_data[message.from_user.id]['waiting_for'] = 'gdrive_credentials'
-        await message.reply_text(
+        msg = await message.reply_text(
             "📤 <b>Upload your credentials.json file now.</b>\n\n"
-            "This should be a Google Service Account JSON file.\n"
+            "This can be:\n"
+            "1. <b>OAuth Client ID JSON</b> (Desktop App) - Recommended\n"
+            "2. <b>Service Account JSON</b>\n\n"
             "Send /cancel to abort."
         )
     
     elif action == "clear":
         await db.delete_gdrive_credentials()
-        await message.reply_text("✅ <b>Google Drive credentials deleted.</b>")
     
     else:
         await message.reply_text("❌ Unknown action. Use <code>/gdrive set</code> or <code>/gdrive clear</code>")
