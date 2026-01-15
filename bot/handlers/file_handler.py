@@ -352,10 +352,49 @@ async def handle_url_logic(client, message, text):
         user_dir = os.path.join(DOWNLOAD_DIR, str(user.id))
         os.makedirs(user_dir, exist_ok=True)
         
-        # Use generic downloader that supports progress
-        from bot.utils.helpers import download_http_file
+        file_path = None
         
-        file_path = await download_http_file(download_url, user_dir, status_msg, user_id=user.id)
+        # Check if URL is from a video platform that requires yt-dlp
+        video_platforms = ['youtube.com', 'youtu.be', 'vimeo.com', 'dailymotion.com', 
+                           'twitch.tv', 'twitter.com', 'x.com', 'facebook.com', 'instagram.com']
+        is_video_platform = any(platform in url.lower() for platform in video_platforms)
+        
+        if is_video_platform:
+            # Use yt-dlp directly for video platforms
+            from bot import ENABLE_YTDLP
+            if ENABLE_YTDLP:
+                await status_msg.edit_text(
+                    "🎬 <b>Video platform detected!</b>\n"
+                    "Downloading with <code>yt-dlp</code>..."
+                )
+                import glob
+                out_tpl = os.path.join(user_dir, "%(title)s.%(ext)s")
+                proc = await asyncio.create_subprocess_exec(
+                    "yt-dlp",
+                    "-o",
+                    out_tpl,
+                    url,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                )
+                await proc.wait()
+                if proc.returncode == 0:
+                    candidates = glob.glob(os.path.join(user_dir, "*"))
+                    if candidates:
+                        file_path = max(candidates, key=os.path.getmtime)
+                if not file_path:
+                    await status_msg.edit_text("❌ Failed to download video. Make sure the URL is valid.")
+                    return
+            else:
+                await status_msg.edit_text(
+                    "❌ <b>YouTube/Video platform links require yt-dlp.</b>\n\n"
+                    "Please set <code>ENABLE_YTDLP=True</code> in your environment variables."
+                )
+                return
+        else:
+            # Use generic HTTP downloader for direct links
+            from bot.utils.helpers import download_http_file
+            file_path = await download_http_file(download_url, user_dir, status_msg, user_id=user.id)
         
         # If HTTP download failed and yt-dlp is enabled, try yt-dlp as a fallback
         if not file_path:
