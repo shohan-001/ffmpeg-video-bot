@@ -286,29 +286,18 @@ async def legacy_text_router(client: Client, message: Message):
              if 'merge_queue' not in user_data[user.id]:
                  user_data[user.id]['merge_queue'] = []
              
+             # Add URL to merge queue
+             if 'merge_queue' not in user_data[user.id]:
+                 user_data[user.id]['merge_queue'] = []
+             
              user_data[user.id]['merge_queue'].append({
                  'type': 'url',
                  'url': url,
                  'name': url[:50]
              })
              
-             count = len(user_data[user.id]['merge_queue'])
-             
-             # Count first video if implicit
-             if user_data[user.id].get('file_path') and os.path.exists(user_data[user.id].get('file_path', '')):
-                 count += 1
-             elif user_data[user.id].get('message_id'):
-                 # Check if it was already in queue? No, queue is explicit list.
-                 # The count logic in callback used queue + implicit.
-                 # Let's trust the queue list count + 1 for display if implicit is there.
-                 pass
-
-             # Re-calculate accurate display count like in callbacks
+             # Count (queue already includes first video if present)
              display_count = len(user_data[user.id]['merge_queue'])
-             first_video_exists = False
-             if user_data[user.id].get('file_path') and os.path.exists(user_data[user.id].get('file_path', '')):
-                 first_video_exists = True
-                 display_count += 1
              
              from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
              keyboard = InlineKeyboardMarkup([
@@ -316,11 +305,9 @@ async def legacy_text_router(client: Client, message: Message):
                  [InlineKeyboardButton("❌ Cancel", callback_data=f"close_{user.id}")]
              ])
              
-             first_note = "\n(Includes First Video)" if first_video_exists else ""
-             
              await message.reply_text(
                  f"✅ URL Added!\n\n"
-                 f"<b>Total Videos:</b> {display_count}{first_note}\n"
+                 f"<b>Total Videos:</b> {display_count}\n"
                  f"Send more or click <b>Done</b>.",
                  reply_markup=keyboard,
                  quote=True

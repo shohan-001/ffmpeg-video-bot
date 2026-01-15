@@ -1562,13 +1562,22 @@ async def process_video(
                         path = await download_file(video['message'], status_msg)
                         video_paths.append(path)
                     elif video['type'] == 'url':
-                        # Download URL using yt-dlp
+                        # Download URL using yt-dlp with fallback to HTTP
                         from bot.utils.ytdlp_handler import download_with_ytdlp
                         url_output_dir = os.path.join(OUTPUT_DIR, str(user_id))
                         os.makedirs(url_output_dir, exist_ok=True)
+                        
                         success_dl, result_dl = await download_with_ytdlp(
                             video['url'], url_output_dir, user_id=user_id
                         )
+                        
+                        if not success_dl:
+                            # Fallback to direct HTTP download
+                            from bot.utils.helpers import download_http_file
+                            await status_msg.edit_text(f"⚠️ yt-dlp failed, trying direct download...")
+                            result_dl = await download_http_file(video['url'], url_output_dir, status_msg, user_id)
+                            success_dl = bool(result_dl)
+                        
                         if success_dl:
                             video_paths.append(result_dl)
                         else:
