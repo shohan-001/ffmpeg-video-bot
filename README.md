@@ -145,28 +145,35 @@ python3 -m bot
 
 ## Commands
 
+### User Commands
 | Command | Description |
 |---------|-------------|
 | `/start` | Start the bot |
 | `/help` | Show help message |
 | `/settings` | View your settings |
-| `/ping` | Check bot latency |
-| `/stats` | Bot statistics (owner only) |
-| `/broadcast` | Broadcast message (owner only) |
-| `/update` | Update bot from git (owner only) |
-| `/restart` | Restart the bot (owner only) |
-| `/log` | View bot logs (owner only) |
-| `/shell` | Run shell commands (owner only) |
-| `/reset` | Reset user settings |
-| `/clean` | Clean defaults/cache (owner only) |
-| `/speedtest` | Run speedtest (owner only) |
-| `/status` | View system status and active queue |
-| `/queue` | View active tasks list |
-| `/dl` | Reply to file/video to process |
+| `/vset` | View detailed encode settings |
 | `/thumb` | View/Set custom thumbnail |
+| `/reset` | Reset user settings |
+| `/queue` | View active tasks list |
+| `/status` | View system status |
+| `/dl` | Reply to file/video to process |
 | `/zip` | Archive file/video |
 | `/unzip` | Extract archive |
-| `/vset` | View detailed settings |
+| `/cancel` | Cancel current operation |
+
+### Admin Commands (Owner Only)
+| Command | Description |
+|---------|-------------|
+| `/cookies` | Manage YT-DLP cookies (upload cookies.txt) |
+| `/gdrive` | Manage GDrive credentials (upload credentials.json) |
+| `/stats` | Bot statistics |
+| `/broadcast` | Broadcast message to all users |
+| `/update` | Update bot from GitHub (auto-restart) |
+| `/restart` | Restart the bot |
+| `/log` | View bot logs |
+| `/shell` | Run shell commands |
+| `/clean` | Clean cache folders |
+| `/speedtest` | Run server speedtest |
 
 ## Usage
 
