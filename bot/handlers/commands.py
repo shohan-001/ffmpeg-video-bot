@@ -7,6 +7,7 @@ import psutil
 import subprocess
 import sys
 import os
+import asyncio
 from time import time
 
 from bot import bot, OWNER_ID, AUTHORIZED_USERS, LOGGER, user_data
@@ -20,6 +21,16 @@ def is_authorized(user_id: int) -> bool:
     if not AUTHORIZED_USERS:
         return True  # Public bot
     return user_id in AUTHORIZED_USERS or user_id == OWNER_ID
+
+async def timeout_wait(message: Message, user_id: int):
+    """Auto-cancel waiting state after timeout"""
+    await asyncio.sleep(60) # 60 seconds timeout
+    if user_data.get(user_id, {}).get('waiting_for') == 'gdrive_credentials':
+        del user_data[user_id]['waiting_for']
+        try:
+            await message.reply_text("⏱ <b>Timeout:</b> Credential upload cancelled.")
+        except:
+            pass
 
 
 @bot.on_message(filters.command("start") & filters.private)
@@ -1161,8 +1172,9 @@ async def gdrive_command(client: Client, message: Message):
             "This can be:\n"
             "1. <b>OAuth Client ID JSON</b> (Desktop App) - Recommended\n"
             "2. <b>Service Account JSON</b>\n\n"
-            "Send /cancel to abort."
+            "Send /cancel to abort. (Auto-cancel in 60s)"
         )
+        asyncio.create_task(timeout_wait(msg, message.from_user.id))
     
     elif action == "clear":
         await db.delete_gdrive_credentials()
