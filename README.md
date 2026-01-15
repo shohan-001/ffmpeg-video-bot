@@ -188,9 +188,14 @@ python3 -m bot
 ### Google Drive Upload Setup
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a project → Enable **Google Drive API**
-3. Create **Service Account** → Download credentials.json
-4. Send `/gdrive set` in bot → Upload credentials.json
-5. **Share** your GDrive folder with the service account email
+3. Create **Service Account**:
+   - Go to IAM & Admin → Service Accounts
+   - Click (+ Create Service Account)
+   - Click Done (Roles are optional)
+   - **Click on the created email**
+   - Go to **KEYS** tab → **ADD KEY** → **Create new key** → **JSON**
+4. Send `/gdrive set` in bot → Upload the downloaded JSON
+5. **Share** your GDrive folder with the *Service Account Email*
 6. Set `GDRIVE_FOLDER_ID` in config.env
 
 ### Group Authorization
