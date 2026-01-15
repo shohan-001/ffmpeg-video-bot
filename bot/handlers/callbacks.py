@@ -114,22 +114,40 @@ async def vidvid_callback(client: Client, query: CallbackQuery):
     user_data[user_id]['waiting_for'] = 'merge_videos'
     user_data[user_id]['merge_queue'] = []  # List to collect videos/URLs
     
+    # Auto-add the first video if already downloaded
+    first_video_name = "First video"
+    first_video_count = 0
+    if user_data[user_id].get('file_path') and os.path.exists(user_data[user_id].get('file_path', '')):
+        first_video_name = user_data[user_id].get('file_name', 'First video')
+        user_data[user_id]['merge_queue'].append({
+            'type': 'file',
+            'path': user_data[user_id]['file_path'],
+            'name': first_video_name
+        })
+        first_video_count = 1
+    elif user_data[user_id].get('message_id'):
+        # Video not downloaded yet, add as telegram message
+        first_video_name = user_data[user_id].get('file_name', 'First video')
+        first_video_count = 1
+        # We'll handle first video separately in multi_merge
+    
     from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
     keyboard = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Done - Start Merge", callback_data=f"merge_done_{user_id}")],
         [InlineKeyboardButton("❌ Cancel", callback_data=f"close_{user_id}")]
     ])
     
+    first_note = f"\n<b>First video:</b> {first_video_name[:40]}" if first_video_count else ""
+    
     await query.message.edit_text(
-        "<b>🎥 Multi-Video Merge</b>\n\n"
-        "Send me videos or video URLs to merge.\n"
-        "You can send multiple videos/links!\n\n"
-        "<b>Supported:</b>\n"
-        "• Telegram video files\n"
-        "• YouTube/yt-dlp supported URLs\n"
-        "• Direct video links\n\n"
-        "<b>Videos in queue:</b> 0\n\n"
-        "Click <b>Done</b> when finished adding.",
+        f"<b>🎥 Multi-Video Merge</b>\n\n"
+        f"Send me MORE videos or video URLs to merge.{first_note}\n\n"
+        f"<b>Supported:</b>\n"
+        f"• Telegram video files\n"
+        f"• YouTube/yt-dlp supported URLs\n"
+        f"• Direct video links\n\n"
+        f"<b>Videos in queue:</b> {first_video_count} (+ videos you send)\n\n"
+        f"Click <b>Done</b> when finished adding.",
         reply_markup=keyboard
     )
     await query.answer()
@@ -1522,21 +1540,25 @@ async def process_video(
             # Multi-video merge with URL support
             videos = options.get('videos', [])
             
-            if len(videos) < 2:
+            # Check length of queue (includes first video if added)
+            if len(videos) < 1:
                 success = False
-                error = "Need at least 2 videos to merge"
+                error = "No videos to merge"
             else:
                 video_paths = []
                 
-                # Download all videos (include first video if set)
+                # Check if first video needs to be added (implicit)
                 first_video_path = input_path if os.path.exists(input_path) else None
-                if first_video_path:
-                    video_paths.append(first_video_path)
                 
+                # Iterate queue and resolve paths
                 for i, video in enumerate(videos):
-                    await status_msg.edit_text(f"📥 Downloading video {i+1}/{len(videos)}...")
+                    await status_msg.edit_text(f"📥 Preparing video {i+1}/{len(videos)}...")
                     
-                    if video['type'] == 'telegram':
+                    if video['type'] == 'file':
+                        # Already local file (first video)
+                        if os.path.exists(video['path']):
+                            video_paths.append(video['path'])
+                    elif video['type'] == 'telegram':
                         path = await download_file(video['message'], status_msg)
                         video_paths.append(path)
                     elif video['type'] == 'url':
@@ -1557,6 +1579,23 @@ async def process_video(
                                     try: os.remove(p)
                                     except: pass
                             return
+                
+                # If Input Path (first video) is NOT in video_paths, prepend it
+                # This handles cases where queue didn't include it explicitly
+                if first_video_path:
+                    # Normalize paths for comparison
+                    norm_first = os.path.normpath(first_video_path)
+                    if not any(os.path.normpath(p) == norm_first for p in video_paths):
+                        video_paths.insert(0, first_video_path)
+                
+                if len(video_paths) < 2:
+                    success = False
+                    error = "Not enough videos (need at least 2)"
+                    # Cleanup usage if we downloaded extra things but failed count check
+                    for p in video_paths:
+                        if p and os.path.exists(p) and p != first_video_path:
+                            try: os.remove(p)
+                            except: pass
                 
                 if len(video_paths) < 2:
                     success = False
