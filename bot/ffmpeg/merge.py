@@ -36,7 +36,33 @@ async def merge_videos(
     
     success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
     
-    # Cleanup concat file
+    if success:
+        try:
+            os.remove(concat_file)
+        except:
+            pass
+        return True, output
+
+    # Fallback: Try Re-encoding (Concat Filter)
+    # This handles different codecs/resolutions but is slower
+    LOGGER.warning(f"Copy merge failed: {result}. Retrying with re-encode...")
+    
+    # Note: parsing streams is complex, assuming 1 video 1 audio for now
+    # Ideally should probe files to see if audio exists
+    
+    cmd = [
+        'ffmpeg', '-y', '-hide_banner',
+        '-i', video1,
+        '-i', video2,
+        '-filter_complex', '[0:v][0:a][1:v][1:a]concat=n=2:v=1:a=1[v][a]',
+        '-map', '[v]', '-map', '[a]',
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+        '-c:a', 'aac', '-b:a', '192k',
+        output
+    ]
+    
+    success, result = await run_ffmpeg_command(cmd, progress_callback, duration)
+    
     try:
         os.remove(concat_file)
     except:
