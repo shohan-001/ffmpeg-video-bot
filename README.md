@@ -186,17 +186,34 @@ python3 -m bot
 5. YouTube downloads should now work!
 
 ### Google Drive Upload Setup
+The bot supports two methods: **OAuth (Recommended)** and **Service Account**.
+
+#### Method 1: OAuth (Recommended for Personal Accounts)
+This method allows the bot to upload directly to your "My Drive" without complex sharing.
+
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a project → Enable **Google Drive API**
-3. Create **Service Account**:
-   - Go to IAM & Admin → Service Accounts
-   - Click (+ Create Service Account)
-   - Click Done (Roles are optional)
-   - **Click on the created email**
-   - Go to **KEYS** tab → **ADD KEY** → **Create new key** → **JSON**
-4. Send `/gdrive set` in bot → Upload the downloaded JSON
-5. **Share** your GDrive folder with the *Service Account Email*
-6. Set `GDRIVE_FOLDER_ID` in config.env
+3. Go to **Credentials** → **+ Create Credentials** → **OAuth Client ID**
+   - Application Type: **Desktop App**
+   - Click Create and **Download JSON**
+4. **Important**: Go to **OAuth Consent Screen**
+   - Set User Type: **External** (if not using Workspace)
+   - Publish the App (otherwise login expires in 7 days)
+   - Add your email as a **Test User** (if blocked from publishing)
+5. Send `/gdrive set` in bot → Upload the JSON file
+6. Send `/gdrive login` → Click the link
+   - **Note**: If you see "Google hasn't verified this app", click **Advanced → Go to App (unsafe)**. This is normal for your own private app.
+   - **Note 2**: If the redirect fails (Connection Refused), copy the `code=...` from the URL bar.
+7. Send `/gdrive auth <code>` to finish.
+
+#### Method 2: Service Account (Advanced)
+Useful for automated environments or shared drives.
+1. Go to IAM & Admin → Service Accounts
+2. Click (+ Create Service Account) → Done
+3. Click on the created email → **KEYS** tab → **ADD KEY** → **JSON**
+4. Send `/gdrive set` in bot → Upload the JSON
+5. **Share** your destination folder with the *Service Account Email* (Editor access)
+6. Send `/gdrive folder <FOLDER_ID>` to set the target.
 
 ### Group Authorization
 Run `/authgrp` in any group to authorize/de-authorize it.
