@@ -39,6 +39,10 @@ async def handle_video(client: Client, message: Message):
     # Get current state
     waiting_for = user_data.get(user.id, {}).get('waiting_for')
     
+    # Ignore if waiting for sensitive files (handled by commands.py group=2)
+    if waiting_for in ['cookies_file', 'gdrive_credentials']:
+        return
+    
     # 1. Check if waiting for Subtitles
     if waiting_for in ['subtitle', 'hardsub']:
         if message.document and is_subtitle_file(fname):
