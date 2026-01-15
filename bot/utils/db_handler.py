@@ -240,6 +240,45 @@ class Database:
             upsert=True
         )
 
+    # ─────────────────────────────────────────────────────────────
+    # Authorized Groups Management
+    # ─────────────────────────────────────────────────────────────
+    async def get_authorized_groups(self) -> list:
+        """Get list of authorized group IDs."""
+        doc = await self._settings.find_one({"_id": "authorized_groups"})
+        return doc.get("groups", []) if doc else []
+
+    async def add_authorized_group(self, group_id: int) -> bool:
+        """Add a group to authorized list. Returns True if added."""
+        groups = await self.get_authorized_groups()
+        if group_id in groups:
+            return False
+        groups.append(group_id)
+        await self._settings.update_one(
+            {"_id": "authorized_groups"},
+            {"$set": {"groups": groups}},
+            upsert=True
+        )
+        return True
+
+    async def remove_authorized_group(self, group_id: int) -> bool:
+        """Remove a group from authorized list. Returns True if removed."""
+        groups = await self.get_authorized_groups()
+        if group_id not in groups:
+            return False
+        groups.remove(group_id)
+        await self._settings.update_one(
+            {"_id": "authorized_groups"},
+            {"$set": {"groups": groups}},
+            upsert=True
+        )
+        return True
+
+    async def is_group_authorized(self, group_id: int) -> bool:
+        """Check if a group is authorized."""
+        groups = await self.get_authorized_groups()
+        return group_id in groups
+
 
 # Global database instance
 db_instance: Database = None

@@ -100,7 +100,7 @@ async def ffcmd_callback(client: Client, query: CallbackQuery):
 
 @bot.on_callback_query(filters.regex(r"^vidvid_"))
 async def vidvid_callback(client: Client, query: CallbackQuery):
-    """Handle Vid+Vid"""
+    """Handle Vid+Vid - Multi-video merge"""
     user_id = int(query.data.split("_")[1])
     
     if query.from_user.id != user_id:
@@ -111,15 +111,52 @@ async def vidvid_callback(client: Client, query: CallbackQuery):
         user_data[user_id] = {}
 
     user_data[user_id]['operation'] = 'merge_video'
-    user_data[user_id]['waiting_for'] = 'second_video'
+    user_data[user_id]['waiting_for'] = 'merge_videos'
+    user_data[user_id]['merge_queue'] = []  # List to collect videos/URLs
     
-    from bot.keyboards.menus import back_and_close_button
+    from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+    keyboard = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Done - Start Merge", callback_data=f"merge_done_{user_id}")],
+        [InlineKeyboardButton("❌ Cancel", callback_data=f"close_{user_id}")]
+    ])
+    
     await query.message.edit_text(
-        "<b>🎥 Vid+Vid (Merge)</b>\n\n"
-        "Send me the second video to merge with.",
-        reply_markup=back_and_close_button(user_id, f"main_{user_id}")
+        "<b>🎥 Multi-Video Merge</b>\n\n"
+        "Send me videos or video URLs to merge.\n"
+        "You can send multiple videos/links!\n\n"
+        "<b>Supported:</b>\n"
+        "• Telegram video files\n"
+        "• YouTube/yt-dlp supported URLs\n"
+        "• Direct video links\n\n"
+        "<b>Videos in queue:</b> 0\n\n"
+        "Click <b>Done</b> when finished adding.",
+        reply_markup=keyboard
     )
     await query.answer()
+
+
+@bot.on_callback_query(filters.regex(r"^merge_done_"))
+async def merge_done_callback(client: Client, query: CallbackQuery):
+    """Start merging collected videos"""
+    user_id = int(query.data.split("_")[2])
+    
+    if query.from_user.id != user_id:
+        await query.answer("Not your button!", show_alert=True)
+        return
+    
+    if user_id not in user_data:
+        await query.answer("No session found!", show_alert=True)
+        return
+    
+    merge_queue = user_data[user_id].get('merge_queue', [])
+    
+    if len(merge_queue) < 2:
+        await query.answer("Need at least 2 videos to merge!", show_alert=True)
+        return
+    
+    user_data[user_id]['waiting_for'] = None
+    await query.answer("Starting merge...")
+    await process_video(client, query, 'multi_merge', {'videos': merge_queue})
 
 
 @bot.on_callback_query(filters.regex(r"^streamswap_"))
@@ -1481,6 +1518,81 @@ async def process_video(
                 else:
                     error = result
 
+        elif operation == 'multi_merge':
+            # Multi-video merge with URL support
+            videos = options.get('videos', [])
+            
+            if len(videos) < 2:
+                success = False
+                error = "Need at least 2 videos to merge"
+            else:
+                video_paths = []
+                
+                # Download all videos (include first video if set)
+                first_video_path = input_path if os.path.exists(input_path) else None
+                if first_video_path:
+                    video_paths.append(first_video_path)
+                
+                for i, video in enumerate(videos):
+                    await status_msg.edit_text(f"📥 Downloading video {i+1}/{len(videos)}...")
+                    
+                    if video['type'] == 'telegram':
+                        path = await download_file(video['message'], status_msg)
+                        video_paths.append(path)
+                    elif video['type'] == 'url':
+                        # Download URL using yt-dlp
+                        from bot.utils.ytdlp_handler import download_with_ytdlp
+                        url_output_dir = os.path.join(OUTPUT_DIR, str(user_id))
+                        os.makedirs(url_output_dir, exist_ok=True)
+                        success_dl, result_dl = await download_with_ytdlp(
+                            video['url'], url_output_dir, user_id=user_id
+                        )
+                        if success_dl:
+                            video_paths.append(result_dl)
+                        else:
+                            await status_msg.edit_text(f"❌ Failed to download: {video['url'][:50]}")
+                            # Cleanup downloaded paths
+                            for p in video_paths:
+                                if p and os.path.exists(p) and p != first_video_path:
+                                    try: os.remove(p)
+                                    except: pass
+                            return
+                
+                if len(video_paths) < 2:
+                    success = False
+                    error = "Not enough videos downloaded"
+                else:
+                    # Merge videos one by one
+                    await status_msg.edit_text(f"⚙️ Merging {len(video_paths)} videos...")
+                    
+                    current_path = video_paths[0]
+                    for i in range(1, len(video_paths)):
+                        merge_output = os.path.join(output_dir, f"merged_{i}.mp4")
+                        success, result = await merge_videos(
+                            current_path, video_paths[i], merge_output,
+                            progress_callback=progress.update, duration=duration
+                        )
+                        
+                        if not success:
+                            error = result
+                            break
+                        
+                        # Cleanup previous merged file (if not first)
+                        if i > 1 and os.path.exists(current_path):
+                            try: os.remove(current_path)
+                            except: pass
+                        
+                        current_path = result
+                    
+                    if success:
+                        output_path = current_path
+                
+                # Cleanup downloaded videos (except input)
+                for p in video_paths:
+                    if p and os.path.exists(p) and p != input_path and p != output_path:
+                        try: os.remove(p)
+                        except: pass
+
         elif operation == 'watermark':
             # Text or Image?
             wm_text = options.pop('text', None)  # Use pop to remove from options
@@ -1708,7 +1820,7 @@ async def upload_telegram_callback(client: Client, query: CallbackQuery):
     status_msg = await query.message.edit_text("📤 Uploading to Telegram...")
     
     try:
-        await upload_file(client, query.message.chat.id, output_path, status_msg)
+        await upload_file(client, query.message.chat.id, output_path, status_msg, user_id=user_id)
         await status_msg.delete()
         
         # Cleanup

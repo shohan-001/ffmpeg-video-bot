@@ -63,7 +63,45 @@ async def handle_video(client: Client, message: Message):
             await message.reply_text("❌ Please send a valid subtitle file (.srt, .ass, .ssa, .vtt).")
             return
 
-    # 2. Check if waiting for Second Video (Vid+Vid)
+    # 2. Check if waiting for merge videos (multi-video merge)
+    if waiting_for == 'merge_videos':
+        # Check if it's a video
+        is_video = False
+        if message.video: is_video = True
+        if message.document and is_video_file(fname): is_video = True
+        
+        if not is_video:
+            await message.reply_text("❌ Please send a valid video file.")
+            return
+
+        # Add to merge queue
+        if 'merge_queue' not in user_data[user.id]:
+            user_data[user.id]['merge_queue'] = []
+        
+        user_data[user.id]['merge_queue'].append({
+            'type': 'telegram',
+            'message': message,
+            'name': fname
+        })
+        
+        count = len(user_data[user.id]['merge_queue'])
+        
+        from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Done - Start Merge", callback_data=f"merge_done_{user.id}")],
+            [InlineKeyboardButton("❌ Cancel", callback_data=f"close_{user.id}")]
+        ])
+        
+        await message.reply_text(
+            f"✅ Video #{count} added!\n\n"
+            f"<b>Queue:</b> {count} videos\n"
+            f"Send more or click <b>Done</b>.",
+            reply_markup=keyboard,
+            quote=True
+        )
+        return
+
+    # 2b. Legacy second_video handler (kept for backward compat)
     if waiting_for == 'second_video':
         # Check if it's a video
         is_video = False
@@ -496,8 +534,6 @@ async def upload_file(client: Client, chat_id: int, file_path: str | list, statu
             await status_msg.edit_text(f"❌ Upload failed: {e}")
             raise e
         return
-
-        return
     
     file_name = os.path.basename(file_path) if isinstance(file_path, str) else "Album"
     progress = Progress(status_msg, "📤 Uploading", user_id=user_id, filename=file_name)
@@ -517,12 +553,51 @@ async def upload_file(client: Client, chat_id: int, file_path: str | list, statu
     
     try:
         if ext in video_exts:
+            # Get video metadata for proper display
+            duration = 0
+            width = 0
+            height = 0
+            thumb_path = None
+            
+            try:
+                from bot.ffmpeg import FFmpeg
+                ffmpeg = FFmpeg(file_path)
+                duration = int(await ffmpeg.get_duration())
+                
+                # Get resolution
+                streams = await ffmpeg.get_streams()
+                video_streams = streams.get('video', [])
+                if video_streams:
+                    width = video_streams[0].get('width', 0)
+                    height = video_streams[0].get('height', 0)
+                
+                # Generate thumbnail
+                thumb_dir = os.path.dirname(file_path)
+                thumb_path = os.path.join(thumb_dir, f"{os.path.splitext(file_name)[0]}_thumb.jpg")
+                await ffmpeg.extract_thumbnail(thumb_path)
+                if not os.path.exists(thumb_path):
+                    thumb_path = None
+            except Exception as e:
+                LOGGER.warning(f"Could not get video metadata: {e}")
+            
             await client.send_video(
                 chat_id,
                 file_path,
                 caption=caption or f"✅ <code>{file_name}</code>",
+                duration=duration,
+                width=width,
+                height=height,
+                thumb=thumb_path,
+                supports_streaming=True,
                 progress=progress.progress_callback
             )
+            
+            # Cleanup thumbnail
+            if thumb_path and os.path.exists(thumb_path):
+                try:
+                    os.remove(thumb_path)
+                except:
+                    pass
         else:
             await client.send_document(
                 chat_id,

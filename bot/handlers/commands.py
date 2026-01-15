@@ -746,6 +746,104 @@ async def queue_command(client: Client, message: Message):
 
 
 # ─────────────────────────────────────────────────────────────
+# Group Authorization Command
+# ─────────────────────────────────────────────────────────────
+@bot.on_message(filters.command("authgrp"))
+async def authgrp_command(client: Client, message: Message):
+    """Handle /authgrp command - Authorize groups for bot usage"""
+    from pyrogram.enums import ChatType
+    
+    # Only owner can authorize groups
+    if message.from_user.id != OWNER_ID:
+        await message.reply_text("❌ This command is owner-only.")
+        return
+    
+    db = get_db()
+    if not db:
+        await message.reply_text("❌ Database not connected.")
+        return
+    
+    chat = message.chat
+    args = message.text.split()
+    
+    # If run in a group by admin, auto-authorize that group
+    if chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+        group_id = chat.id
+        
+        # Check if already authorized
+        if await db.is_group_authorized(group_id):
+            # Toggle: remove if already authorized
+            await db.remove_authorized_group(group_id)
+            await message.reply_text(
+                f"✅ <b>Group De-authorized!</b>\n\n"
+                f"<b>Group:</b> {chat.title}\n"
+                f"<b>ID:</b> <code>{group_id}</code>\n\n"
+                f"Bot will no longer work in this group."
+            )
+        else:
+            # Authorize
+            await db.add_authorized_group(group_id)
+            await message.reply_text(
+                f"✅ <b>Group Authorized!</b>\n\n"
+                f"<b>Group:</b> {chat.title}\n"
+                f"<b>ID:</b> <code>{group_id}</code>\n\n"
+                f"Bot is now active in this group!"
+            )
+        return
+    
+    # If run in private, show usage or handle args
+    if len(args) == 1:
+        # Show list of authorized groups
+        groups = await db.get_authorized_groups()
+        if groups:
+            group_list = "\n".join([f"• <code>{g}</code>" for g in groups])
+            await message.reply_text(
+                f"<b>📋 Authorized Groups</b>\n\n"
+                f"{group_list}\n\n"
+                f"<b>Usage:</b>\n"
+                f"• Run <code>/authgrp</code> IN a group to toggle\n"
+                f"• <code>/authgrp add GroupID</code>\n"
+                f"• <code>/authgrp remove GroupID</code>"
+            )
+        else:
+            await message.reply_text(
+                f"<b>📋 No Authorized Groups</b>\n\n"
+                f"<b>Usage:</b>\n"
+                f"• Run <code>/authgrp</code> IN a group to authorize\n"
+                f"• <code>/authgrp add GroupID</code>"
+            )
+        return
+    
+    action = args[1].lower()
+    
+    if action in ["add", "remove"] and len(args) >= 3:
+        try:
+            group_id = int(args[2])
+        except ValueError:
+            await message.reply_text("❌ Invalid group ID. Must be a number.")
+            return
+        
+        if action == "add":
+            if await db.add_authorized_group(group_id):
+                await message.reply_text(f"✅ Group <code>{group_id}</code> authorized!")
+            else:
+                await message.reply_text(f"ℹ️ Group <code>{group_id}</code> already authorized.")
+        else:
+            if await db.remove_authorized_group(group_id):
+                await message.reply_text(f"✅ Group <code>{group_id}</code> removed!")
+            else:
+                await message.reply_text(f"ℹ️ Group <code>{group_id}</code> not in list.")
+    else:
+        await message.reply_text(
+            "❌ <b>Invalid usage</b>\n\n"
+            "<b>Usage:</b>\n"
+            "• Run <code>/authgrp</code> IN a group to toggle\n"
+            "• <code>/authgrp add GroupID</code>\n"
+            "• <code>/authgrp remove GroupID</code>"
+        )
+
+
+# ─────────────────────────────────────────────────────────────
 # Cookie Management Commands
 # ─────────────────────────────────────────────────────────────
 @bot.on_message(filters.command("cookies") & filters.private)

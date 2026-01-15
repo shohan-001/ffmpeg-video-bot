@@ -73,6 +73,37 @@ async def handle_text_input(client: Client, message: Message):
         text = message.text
         LOGGER.info(f"Processing input '{text}' for state '{waiting_for}' from user {user_id}")
         
+        # Handle merge_videos URL input
+        if waiting_for == 'merge_videos':
+            # Check if it's a URL
+            if text.startswith('http://') or text.startswith('https://'):
+                # Add URL to merge queue
+                if 'merge_queue' not in user_data[user_id]:
+                    user_data[user_id]['merge_queue'] = []
+                
+                user_data[user_id]['merge_queue'].append({
+                    'type': 'url',
+                    'url': text,
+                    'name': text[:50]
+                })
+                
+                count = len(user_data[user_id]['merge_queue'])
+                
+                from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ Done - Start Merge", callback_data=f"merge_done_{user_id}")],
+                    [InlineKeyboardButton("❌ Cancel", callback_data=f"close_{user_id}")]
+                ])
+                
+                await message.reply_text(
+                    f"✅ URL #{count} added!\n\n"
+                    f"<b>Queue:</b> {count} videos\n"
+                    f"Send more or click <b>Done</b>.",
+                    reply_markup=keyboard,
+                    quote=True
+                )
+                return
+        
         # Handle different inputs
         if waiting_for == 'metadata_input':
             # Parse metadata input
