@@ -1965,9 +1965,16 @@ async def upload_gdrive_callback(client: Client, query: CallbackQuery):
             except:
                 pass
         
+        # Determine Folder ID (DB > Env)
+        from bot import GDRIVE_FOLDER_ID
+        from bot.utils.db_handler import get_db
+        db = get_db()
+        db_folder_id = await db.get_gdrive_folder_id()
+        folder_id_to_use = db_folder_id if db_folder_id else GDRIVE_FOLDER_ID
+
         success, result = await gdrive.upload_file(
             real_upload_path,
-            folder_id=GDRIVE_FOLDER_ID if GDRIVE_FOLDER_ID else None,
+            folder_id=folder_id_to_use if folder_id_to_use else None,
             progress_callback=progress_callback
         )
         

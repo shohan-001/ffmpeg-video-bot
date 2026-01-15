@@ -1056,11 +1056,15 @@ async def gdrive_command(client: Client, message: Message):
     if len(args) == 1:
         # Show status
         has_creds = await db.has_gdrive_credentials()
-        from bot import GDRIVE_ENABLED, GDRIVE_FOLDER_ID
+        from bot import GDRIVE_ENABLED, GDRIVE_FOLDER_ID as ENV_FOLDER_ID
+        
+        # Prefer DB folder ID
+        db_folder_id = await db.get_gdrive_folder_id()
+        folder_id = db_folder_id or ENV_FOLDER_ID
         
         status = "✅ Credentials set" if has_creds else "❌ No credentials"
         enabled = "✅ Enabled" if GDRIVE_ENABLED else "❌ Disabled"
-        folder = f"<code>{GDRIVE_FOLDER_ID}</code>" if GDRIVE_FOLDER_ID else "❌ Not set"
+        folder = f"<code>{folder_id}</code>" if folder_id else "❌ Not set"
         
         await message.reply_text(
             f"<b>☁️ Google Drive Status</b>\n\n"
@@ -1069,6 +1073,7 @@ async def gdrive_command(client: Client, message: Message):
             f"<b>Folder ID:</b> {folder}\n\n"
             f"<b>Commands:</b>\n"
             f"• <code>/gdrive set</code> - Upload credentials.json\n"
+            f"• <code>/gdrive folder &lt;ID&gt;</code> - Set Folder ID\n"
             f"• <code>/gdrive clear</code> - Delete credentials\n\n"
             f"<b>Setup:</b>\n"
             f"1. Create a Google Cloud project\n"
@@ -1080,6 +1085,16 @@ async def gdrive_command(client: Client, message: Message):
         return
     
     action = args[1].lower()
+
+    if action == "folder":
+        if len(args) < 3:
+            await message.reply_text("❌ Usage: <code>/gdrive folder <FOLDER_ID></code>")
+            return
+        
+        folder_id = args[2].strip()
+        await db.set_gdrive_folder_id(folder_id)
+        await message.reply_text(f"✅ <b>Google Drive Folder ID set!</b>\n\nID: <code>{folder_id}</code>")
+        return
     
     if action == "set":
         user_data[message.from_user.id] = user_data.get(message.from_user.id, {})

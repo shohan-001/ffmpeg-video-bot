@@ -224,6 +224,19 @@ class Database:
         doc = await self._settings.find_one({"_id": "gdrive_credentials"})
         return doc is not None
 
+    async def get_gdrive_folder_id(self) -> str:
+        """Get GDrive folder ID (checks DB first, then env default will be handled by caller)."""
+        doc = await self._settings.find_one({"_id": "gdrive_folder_id"})
+        return doc.get("value") if doc else None
+
+    async def set_gdrive_folder_id(self, folder_id: str):
+        """Set GDrive folder ID."""
+        await self._settings.update_one(
+            {"_id": "gdrive_folder_id"},
+            {"$set": {"value": folder_id}},
+            upsert=True
+        )
+
     # ─────────────────────────────────────────────────────────────
     # Bot Config Storage (for dynamic settings)
     # ─────────────────────────────────────────────────────────────
