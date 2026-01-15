@@ -1944,8 +1944,7 @@ async def upload_gdrive_callback(client: Client, query: CallbackQuery):
     try:
         gdrive = get_gdrive()
         if not gdrive.is_ready:
-            init_gdrive()
-            gdrive = get_gdrive()
+            await gdrive.initialize()
         
         if not gdrive.is_ready:
             await status_msg.edit_text(

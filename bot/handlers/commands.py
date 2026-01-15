@@ -1023,6 +1023,10 @@ async def handle_document_upload(client: Client, message: Message):
             db = get_db()
             await db.set_gdrive_credentials(creds_data)
             
+            # Re-initialize GDrive immediately
+            from bot.utils.gdrive import get_gdrive
+            await get_gdrive().initialize()
+            
             os.remove(file_path)
             
             await status_msg.edit_text(

@@ -32,7 +32,7 @@ class GoogleDrive:
         self.service = None
         self._initialized = False
         
-    def initialize(self) -> bool:
+    async def initialize(self) -> bool:
         """Initialize the Drive service"""
         try:
             credentials = None
@@ -49,29 +49,17 @@ class GoogleDrive:
                 try:
                     from bot.utils.db_handler import get_db
                     import json
-                    import tempfile
                     
                     db = get_db()
                     if db:
-                        # Run async in sync context
-                        import asyncio
-                        loop = asyncio.get_event_loop()
-                        creds_data = loop.run_until_complete(db.get_gdrive_credentials())
+                        creds_data = await db.get_gdrive_credentials()
                         
                         if creds_data:
-                            # Write to temp file for the Google library
                             creds_json = json.loads(creds_data)
-                            temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
-                            json.dump(creds_json, temp_file)
-                            temp_file.close()
-                            
-                            credentials = service_account.Credentials.from_service_account_file(
-                                temp_file.name,
+                            credentials = service_account.Credentials.from_service_account_info(
+                                creds_json,
                                 scopes=SCOPES
                             )
-                            
-                            # Cleanup temp file
-                            os.remove(temp_file.name)
                             LOGGER.info("Using credentials from MongoDB")
                 except Exception as e:
                     LOGGER.warning(f"Could not load credentials from MongoDB: {e}")
@@ -113,7 +101,7 @@ class GoogleDrive:
             Tuple of (success, file_id or error message)
         """
         if not self.is_ready:
-            if not self.initialize():
+            if not await self.initialize():
                 return False, "Google Drive not configured"
         
         try:
@@ -270,7 +258,7 @@ def init_gdrive(credentials_file: str = None) -> GoogleDrive:
     """Initialize the global Google Drive instance"""
     global gdrive
     gdrive = GoogleDrive(credentials_file)
-    gdrive.initialize()
+    # Initialization is now async and must be called by the user
     return gdrive
 
 
