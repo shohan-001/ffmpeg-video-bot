@@ -164,6 +164,7 @@ python3 -m bot
 ### Admin Commands (Owner Only)
 | Command | Description |
 |---------|-------------|
+| `/authgrp` | Authorize groups (run in group to toggle) |
 | `/cookies` | Manage YT-DLP cookies (upload cookies.txt) |
 | `/gdrive` | Manage GDrive credentials (upload credentials.json) |
 | `/stats` | Bot statistics |
@@ -175,12 +176,41 @@ python3 -m bot
 | `/clean` | Clean cache folders |
 | `/speedtest` | Run server speedtest |
 
+## Setup Guides
+
+### YouTube Cookie Setup (for age-restricted/private videos)
+1. Install **"Get cookies.txt LOCALLY"** Chrome extension
+2. Go to YouTube and **login** to your account
+3. Click extension icon → **Export** cookies.txt
+4. Send `/cookies set` in bot → Upload the file
+5. YouTube downloads should now work!
+
+### Google Drive Upload Setup
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a project → Enable **Google Drive API**
+3. Create **Service Account** → Download credentials.json
+4. Send `/gdrive set` in bot → Upload credentials.json
+5. **Share** your GDrive folder with the service account email
+6. Set `GDRIVE_FOLDER_ID` in config.env
+
+### Group Authorization
+Run `/authgrp` in any group to authorize/de-authorize it.
+- Running in group toggles authorization
+- `/authgrp` in private shows authorized groups list
+- `/authgrp add <ID>` or `/authgrp remove <ID>` to manage manually
+
 ## Usage
 
 1. Send a video file to the bot
 2. Select an operation from the menu
 3. Follow the prompts
 4. Receive your processed video!
+
+### Multi-Video Merge
+1. Click **Vid+Vid** in the menu
+2. Send multiple videos or YouTube URLs
+3. Click **Done - Start Merge** when finished
+4. Videos will be merged in order
 
 ## Support
 
@@ -189,3 +219,4 @@ Join our Telegram channel for updates and support.
 ## License
 
 MIT License - See LICENSE file for details.
+
