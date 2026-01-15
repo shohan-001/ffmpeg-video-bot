@@ -39,12 +39,16 @@ class GoogleDrive:
             
             # First, try file-based credentials
             if os.path.exists(self.credentials_file):
-                credentials = service_account.Credentials.from_service_account_file(
-                    self.credentials_file,
-                    scopes=SCOPES
-                )
-                LOGGER.info("Using credentials from file")
-            else:
+                try:
+                    credentials = service_account.Credentials.from_service_account_file(
+                        self.credentials_file,
+                        scopes=SCOPES
+                    )
+                    LOGGER.info("Using credentials from file")
+                except Exception as e:
+                    LOGGER.warning(f"Local credentials file failed: {e}. Trying database...")
+            
+            if not credentials:
                 # Try to load from MongoDB
                 try:
                     from bot.utils.db_handler import get_db
