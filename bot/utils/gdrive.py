@@ -39,7 +39,7 @@ class GoogleDrive:
         flow = Flow.from_client_config(
             client_secrets,
             scopes=SCOPES,
-            redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+            redirect_uri='http://127.0.0.1'
         )
         auth_url, _ = flow.authorization_url(prompt='consent')
         return auth_url
@@ -50,7 +50,7 @@ class GoogleDrive:
             flow = Flow.from_client_config(
                 client_secrets,
                 scopes=SCOPES,
-                redirect_uri='urn:ietf:wg:oauth:2.0:oob'
+                redirect_uri='http://127.0.0.1'
             )
             flow.fetch_token(code=code)
             return flow.credentials.to_json()

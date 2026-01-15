@@ -1119,7 +1119,9 @@ async def gdrive_command(client: Client, message: Message):
             await message.reply_text(
                 f"<b>🔐 Google Drive Login</b>\n\n"
                 f"1. <a href='{auth_url}'>Click here to Authorize</a>\n"
-                f"2. Copy the authorization code\n"
+                f"2. ⚠️ <b>When the page fails to load</b> (Connection Refused):\n"
+                f"   Look at the URL bar. Copy the text starting from <code>4/</code>...\n"
+                f"   (Copy everything after <code>code=</code> up to <code>&scope</code>)\n\n"
                 f"3. Send: <code>/gdrive auth &lt;code&gt;</code>"
             )
         except Exception as e:
