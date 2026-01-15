@@ -43,33 +43,28 @@ async def handle_text_input(client: Client, message: Message):
             return
         user_id = user.id
 
-        # If message comes from a group/supergroup, enforce authorized groups (if configured)
-        if message.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
-            if AUTHORIZED_GROUPS and message.chat.id not in AUTHORIZED_GROUPS:
-                # Silently ignore in unauthorized groups to avoid spam
-                return
-        
-        # Debug log
-        LOGGER.info(f"Received text from {user_id}: {message.text}")
-        
         if user_id not in user_data:
             # If user sends text but has no session
             # Only reply in private to avoid spamming groups
             if message.chat.type == ChatType.PRIVATE:
                 # No active session; we keep silent or could show a short hint
-                # await message.reply_text("Send a video first to start processing.")
                 pass
             return
             
         waiting_for = user_data[user_id].get('waiting_for')
         
+        # If NOT waiting for input, enforce group authorization
         if not waiting_for:
-            # Only reply in private
+            if message.chat.type in (ChatType.GROUP, ChatType.SUPERGROUP):
+                if AUTHORIZED_GROUPS and message.chat.id not in AUTHORIZED_GROUPS:
+                    return
+            
+            # Only reply in private if random text
             if message.chat.type == ChatType.PRIVATE:
-                 # await message.reply_text("DEBUG: Not waiting for input.")
                  pass
             return
             
+        # We ARE waiting for input, so process it regardless of group
         text = message.text
         LOGGER.info(f"Processing input '{text}' for state '{waiting_for}' from user {user_id}")
         
