@@ -272,7 +272,62 @@ async def legacy_text_router(client: Client, message: Message):
 
     # If this looks like a URL anywhere in the text, pass to URL logic
     if "http://" in text or "https://" in text:
-        # Simple extraction: take first http(s) substring
+        # Special case: Multi-video merge (Vid+Vid)
+        # Verify valid state before hijacking for download
+        waiting_for = user_data.get(user.id, {}).get('waiting_for')
+        
+        if waiting_for == 'merge_videos':
+             # Identify the URL
+             import re
+             match = re.search(r'(https?://\S+)', text)
+             url = match.group(1) if match else text
+             
+             # Add URL to merge queue
+             if 'merge_queue' not in user_data[user.id]:
+                 user_data[user.id]['merge_queue'] = []
+             
+             user_data[user.id]['merge_queue'].append({
+                 'type': 'url',
+                 'url': url,
+                 'name': url[:50]
+             })
+             
+             count = len(user_data[user.id]['merge_queue'])
+             
+             # Count first video if implicit
+             if user_data[user.id].get('file_path') and os.path.exists(user_data[user.id].get('file_path', '')):
+                 count += 1
+             elif user_data[user.id].get('message_id'):
+                 # Check if it was already in queue? No, queue is explicit list.
+                 # The count logic in callback used queue + implicit.
+                 # Let's trust the queue list count + 1 for display if implicit is there.
+                 pass
+
+             # Re-calculate accurate display count like in callbacks
+             display_count = len(user_data[user.id]['merge_queue'])
+             first_video_exists = False
+             if user_data[user.id].get('file_path') and os.path.exists(user_data[user.id].get('file_path', '')):
+                 first_video_exists = True
+                 display_count += 1
+             
+             from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+             keyboard = InlineKeyboardMarkup([
+                 [InlineKeyboardButton("✅ Done - Start Merge", callback_data=f"merge_done_{user.id}")],
+                 [InlineKeyboardButton("❌ Cancel", callback_data=f"close_{user.id}")]
+             ])
+             
+             first_note = "\n(Includes First Video)" if first_video_exists else ""
+             
+             await message.reply_text(
+                 f"✅ URL Added!\n\n"
+                 f"<b>Total Videos:</b> {display_count}{first_note}\n"
+                 f"Send more or click <b>Done</b>.",
+                 reply_markup=keyboard,
+                 quote=True
+             )
+             return
+
+        # Default URL handling (Download)
         import re
         match = re.search(r'(https?://\S+)', text)
         url = match.group(1) if match else text
