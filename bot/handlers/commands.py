@@ -33,7 +33,7 @@ async def timeout_wait(message: Message, user_id: int):
             pass
 
 
-@bot.on_message(filters.command("start") & filters.private)
+@bot.on_message(filters.command("start"))
 async def start_command(client: Client, message: Message):
     """Handle /start command"""
     user = message.from_user
@@ -71,7 +71,7 @@ async def start_command(client: Client, message: Message):
     await message.reply_text(welcome_text, reply_markup=close_button(user.id))
 
 
-@bot.on_message(filters.command("help") & filters.private)
+@bot.on_message(filters.command("help"))
 async def help_command(client: Client, message: Message):
     """Handle /help command"""
     user = message.from_user
@@ -115,7 +115,7 @@ async def help_command(client: Client, message: Message):
     await message.reply_text(help_text, reply_markup=close_button(user.id))
 
 
-@bot.on_message(filters.command("ping") & filters.private)
+@bot.on_message(filters.command("ping"))
 async def ping_command(client: Client, message: Message):
     """Handle /ping command"""
     start = time()
@@ -126,7 +126,7 @@ async def ping_command(client: Client, message: Message):
     await msg.edit_text(f"🏓 <b>Pong!</b>\n\n<b>Latency:</b> {latency:.2f}ms")
 
 
-@bot.on_message(filters.command("stats") & filters.private)
+@bot.on_message(filters.command("stats"))
 async def stats_command(client: Client, message: Message):
     """Handle /stats command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -154,7 +154,7 @@ async def stats_command(client: Client, message: Message):
     await message.reply_text(stats_text, reply_markup=close_button(message.from_user.id))
 
 
-@bot.on_message(filters.command("settings") & filters.private)
+@bot.on_message(filters.command("settings"))
 async def settings_command(client: Client, message: Message):
     """Handle /settings command"""
     user = message.from_user
@@ -177,7 +177,7 @@ async def settings_command(client: Client, message: Message):
     await message.reply_text("<b>⚙️ Settings Menu</b>", reply_markup=menu)
 
 
-@bot.on_message(filters.command("vset") & filters.private)
+@bot.on_message(filters.command("vset"))
 async def vset_command(client: Client, message: Message):
     """Handle /vset command (View Settings) - Reference Bot Style"""
     user = message.from_user
@@ -253,7 +253,7 @@ Channels: {chn}
     await message.reply_text(msg, reply_markup=close_button(user.id))
 
 
-@bot.on_message(filters.command("broadcast") & filters.private)
+@bot.on_message(filters.command("broadcast"))
 async def broadcast_command(client: Client, message: Message):
     """Handle /broadcast command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -288,7 +288,7 @@ async def broadcast_command(client: Client, message: Message):
     )
 
 
-@bot.on_message(filters.command("restart") & filters.private)
+@bot.on_message(filters.command("restart"))
 async def restart_command(client: Client, message: Message):
     """Handle /restart command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -301,7 +301,7 @@ async def restart_command(client: Client, message: Message):
     os.execl(sys.executable, sys.executable, "-m", "bot")
 
 
-@bot.on_message(filters.command("update") & filters.private)
+@bot.on_message(filters.command("update"))
 async def update_command(client: Client, message: Message):
     """Handle /update command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -359,7 +359,7 @@ async def update_command(client: Client, message: Message):
         await status_msg.edit_text(f"❌ <b>Error:</b> {str(e)[:200]}")
 
 
-@bot.on_message(filters.command("shell") & filters.private)
+@bot.on_message(filters.command("shell"))
 async def shell_command(client: Client, message: Message):
     """Handle /shell command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -401,7 +401,7 @@ async def shell_command(client: Client, message: Message):
         await status_msg.edit_text(f"❌ <b>Error:</b> {str(e)[:200]}")
 
 
-@bot.on_message(filters.command("log") & filters.private)
+@bot.on_message(filters.command("log"))
 async def log_command(client: Client, message: Message):
     """Handle /log command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -431,7 +431,7 @@ async def log_command(client: Client, message: Message):
         await message.reply_text(f"❌ Error reading log: {e}")
 
 
-@bot.on_message(filters.command("unzip") & filters.private)
+@bot.on_message(filters.command("unzip"))
 async def unzip_command(client: Client, message: Message):
     """Handle /unzip command"""
     user = message.from_user
@@ -488,7 +488,7 @@ async def unzip_command(client: Client, message: Message):
         await status_msg.edit_text(f"❌ Error: {e}")
 
 
-@bot.on_message(filters.command("zip") & filters.private)
+@bot.on_message(filters.command("zip"))
 async def zip_command(client: Client, message: Message):
     """Handle /zip command"""
     user = message.from_user
@@ -523,7 +523,7 @@ async def zip_command(client: Client, message: Message):
         await status_msg.edit_text(f"❌ Error: {e}")
 
 
-@bot.on_message(filters.command("thumb") & filters.private)
+@bot.on_message(filters.command("thumb"))
 async def thumb_command(client: Client, message: Message):
     """Handle /thumb command (View/Set/Delete Thumbnail)"""
     user = message.from_user
@@ -557,7 +557,7 @@ async def thumb_command(client: Client, message: Message):
         )
 
 
-@bot.on_message(filters.command("reset") & filters.private)
+@bot.on_message(filters.command("reset"))
 async def reset_command(client: Client, message: Message):
     """Handle /reset command"""
     user = message.from_user
@@ -572,7 +572,7 @@ async def reset_command(client: Client, message: Message):
     await message.reply_text("✅ <b>Settings have been reset to default!</b>")
 
 
-@bot.on_message(filters.command("clean") & filters.private)
+@bot.on_message(filters.command("clean"))
 async def clean_command(client: Client, message: Message):
     """Handle /clean command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -606,7 +606,7 @@ async def clean_command(client: Client, message: Message):
         await status_msg.edit_text(f"❌ Error during clean: {e}")
 
 
-@bot.on_message(filters.command("dl") & filters.private)
+@bot.on_message(filters.command("dl"))
 async def dl_command(client: Client, message: Message):
     """Handle /dl command"""
     user = message.from_user
@@ -640,7 +640,7 @@ async def dl_command(client: Client, message: Message):
         await message.reply_text("❌ Unsupported media type. Reply to Video, Audio, or URL.")
 
 
-@bot.on_message(filters.command("speedtest") & filters.private)
+@bot.on_message(filters.command("speedtest"))
 async def speedtest_command(client: Client, message: Message):
     """Handle /speedtest command - Owner only"""
     if message.from_user.id != OWNER_ID:
@@ -702,7 +702,7 @@ async def speedtest_command(client: Client, message: Message):
         await status_msg.edit_text(f"❌ Error: {e}")
 
 
-@bot.on_message(filters.command("status") & filters.private)
+@bot.on_message(filters.command("status"))
 async def status_command(client: Client, message: Message):
     """Handle /status command"""
     user = message.from_user
@@ -733,7 +733,7 @@ async def status_command(client: Client, message: Message):
     await message.reply_text(msg, reply_markup=close_button(user.id))
 
 
-@bot.on_message(filters.command("queue") & filters.private)
+@bot.on_message(filters.command("queue"))
 async def queue_command(client: Client, message: Message):
     """Handle /queue command - Show active tasks"""
     user = message.from_user
@@ -857,7 +857,7 @@ async def authgrp_command(client: Client, message: Message):
 # ─────────────────────────────────────────────────────────────
 # Cookie Management Commands
 # ─────────────────────────────────────────────────────────────
-@bot.on_message(filters.command("cookies") & filters.private)
+@bot.on_message(filters.command("cookies"))
 async def cookies_command(client: Client, message: Message):
     """Handle /cookies command - Manage yt-dlp cookies"""
     if message.from_user.id != OWNER_ID:
@@ -1056,7 +1056,7 @@ async def handle_document_upload(client: Client, message: Message):
 # ─────────────────────────────────────────────────────────────
 # Google Drive Credentials Command
 # ─────────────────────────────────────────────────────────────
-@bot.on_message(filters.command("gdrive") & filters.private)
+@bot.on_message(filters.command("gdrive"))
 async def gdrive_command(client: Client, message: Message):
     """Handle /gdrive command - Manage Google Drive credentials"""
     if message.from_user.id != OWNER_ID:
