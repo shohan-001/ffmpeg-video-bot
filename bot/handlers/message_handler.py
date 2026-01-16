@@ -275,6 +275,66 @@ async def handle_text_input(client: Client, message: Message):
             await process_video(client, MockQuery(message, user), 'generate_sample', 
                                 {'duration': duration, 'start': start_time})
 
+        elif waiting_for == 'new_filename':
+            # Handle Rename Input
+            from bot.utils.helpers import sanitize_filename
+            old_path = user_data[user_id].get('processing_file') or user_data[user_id].get('file_path')
+            if not old_path or not os.path.exists(old_path):
+                await message.reply_text("❌ Original file lost. Please upload again.")
+                return
+            
+            new_name = sanitize_filename(text.strip())
+            new_path = os.path.join(os.path.dirname(old_path), new_name)
+            
+            try:
+                os.rename(old_path, new_path)
+                user_data[user_id]['file_path'] = new_path
+                user_data[user_id]['processing_file'] = new_path
+                user_data[user_id]['file_name'] = new_name
+                user_data[user_id]['waiting_for'] = None
+                
+                await message.reply_text(
+                    f"✅ Renamed to: <code>{new_name}</code>",
+                    reply_markup=main_menu(user_id),
+                    quote=True
+                )
+            except Exception as e:
+                await message.reply_text(f"❌ Rename failed: {e}")
+
+        elif waiting_for == 'final_rename_input':
+            # Handle Final Rename Input
+            from bot.utils.helpers import sanitize_filename
+            old_path = user_data[user_id].get('output_path')
+            if not old_path or not os.path.exists(old_path):
+                await message.reply_text("❌ Processed file lost.")
+                return
+            
+            new_name = sanitize_filename(text.strip())
+            new_path = os.path.join(os.path.dirname(old_path), new_name)
+            
+            try:
+                os.rename(old_path, new_path)
+                user_data[user_id]['output_path'] = new_path
+                user_data[user_id]['waiting_for'] = None
+                
+                status_msg = await message.reply_text(f"✅ Renamed to: <code>{new_name}</code>\nUploading...")
+                
+                from bot.handlers.callbacks import upload_processed_file
+                await upload_processed_file(client, user_id, status_msg, "telegram")
+            except Exception as e:
+                await message.reply_text(f"❌ Rename failed: {e}")
+
+        else:
+            # Unknown waiting_for state - check if URL
+            if text.startswith('http://') or text.startswith('https://'):
+                from bot.handlers.file_handler import handle_url_logic
+                await handle_url_logic(client, message, text)
+            else:
+                # Unknown state, just clear it
+                LOGGER.warning(f"Unknown waiting_for state: {waiting_for}")
+                user_data[user_id]['waiting_for'] = None
+                await message.reply_text(f"✅ Input received: <code>{text}</code>", quote=True)
+
     except Exception as e:
         LOGGER.error(f"Error in text handler: {e}", exc_info=True)
         # Try to notify user if possible, but safely
