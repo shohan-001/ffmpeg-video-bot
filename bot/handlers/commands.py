@@ -181,6 +181,8 @@ async def settings_command(client: Client, message: Message):
 async def vset_command(client: Client, message: Message):
     """Handle /vset command (View Settings) - Reference Bot Style"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
 
@@ -435,6 +437,8 @@ async def log_command(client: Client, message: Message):
 async def unzip_command(client: Client, message: Message):
     """Handle /unzip command"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
 
@@ -492,6 +496,8 @@ async def unzip_command(client: Client, message: Message):
 async def zip_command(client: Client, message: Message):
     """Handle /zip command"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
 
@@ -527,6 +533,8 @@ async def zip_command(client: Client, message: Message):
 async def thumb_command(client: Client, message: Message):
     """Handle /thumb command (View/Set/Delete Thumbnail)"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
 
@@ -561,6 +569,8 @@ async def thumb_command(client: Client, message: Message):
 async def reset_command(client: Client, message: Message):
     """Handle /reset command"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
         
@@ -610,6 +620,8 @@ async def clean_command(client: Client, message: Message):
 async def dl_command(client: Client, message: Message):
     """Handle /dl command"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
         
@@ -706,6 +718,8 @@ async def speedtest_command(client: Client, message: Message):
 async def status_command(client: Client, message: Message):
     """Handle /status command"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
     
@@ -737,6 +751,8 @@ async def status_command(client: Client, message: Message):
 async def queue_command(client: Client, message: Message):
     """Handle /queue command - Show active tasks"""
     user = message.from_user
+    if not user:
+        return  # Ignore channel posts or anonymous admins
     if not is_authorized(user.id):
         return
         
@@ -1181,3 +1197,4 @@ async def gdrive_command(client: Client, message: Message):
     
     else:
         await message.reply_text("❌ Unknown action. Use <code>/gdrive set</code> or <code>/gdrive clear</code>")
+
